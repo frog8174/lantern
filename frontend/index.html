@@ -91,8 +91,21 @@
       <button id="wsDelete" class="tool ws-only">刪除 workspace</button>
     </div>
   </div>
+  <!-- 「論文｜Wiki」分頁；全部論文沒有 wiki，ws-only 會把它藏起來 -->
+  <div id="wsTabs" class="wtabs ws-only" role="group" aria-label="檢視">
+    <button data-tab="papers" aria-pressed="true">論文</button><button data-tab="wiki" aria-pressed="false">Wiki</button>
+  </div>
   <div id="wsStatus" class="muted small"></div>
   <div id="wsPapers" class="cards papers"></div>
+  <div id="wsWiki" class="wiki" hidden>
+    <nav class="wnav" aria-label="Wiki 頁面">
+      <div class="wupd"><button id="wikiUpdate" class="tool" disabled>更新 Wiki</button><span id="wikiPending" class="muted small"></span></div>
+      <progress id="wikiBar" hidden></progress>
+      <div id="wikiProg" class="small muted" role="status" aria-live="polite"></div>
+      <ul id="wikiList" class="wlist"></ul>
+    </nav>
+    <article id="wikiPage" class="wpage"></article>
+  </div>
 </div></section>
 
 <!-- 「加入既有論文」：從其他論文挑一篇 -->

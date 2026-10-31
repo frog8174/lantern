@@ -1479,12 +1479,14 @@ $("#wsGrid").onclick = async (e) => {
 };
 
 async function showWs(ws = curWs) {
+  if (ws?.id !== curWs?.id) { wsTab = "papers"; wikiSlug = null; $("#wikiProg").textContent = ""; $("#wikiBar").hidden = true; }
   curWs = ws;
   setView("ws");
   $("#wsTitle").textContent = ws ? ws.name : "全部論文";
   $$("#wsView .ws-only").forEach((b) => (b.hidden = !ws));
   $("#wsStatus").textContent = "";
-  const papers = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
+  setWsTab(ws ? wsTab : "papers");
+  const papers = wsPaperList = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
   const del = ws ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
   $("#wsPapers").innerHTML = papers.map((p) => `<div class="card" data-id="${escapeHTML(p.id)}">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
@@ -1501,6 +1503,129 @@ $("#wsPapers").onclick = async (e) => {
   else if (confirm("刪除這篇論文與所有標註？")) await api(`/api/papers/${id}`, { method: "DELETE" });
   else return;
   showWs();
+};
+
+/* ---------------- Workspace Wiki（docs/wiki.md） ---------------- */
+let wsTab = "papers", wsPaperList = [], wikiSlug = null, wikiBusy = false;
+
+function setWsTab(t) {
+  wsTab = t;
+  $$("#wsTabs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === t));
+  $("#wsPapers").hidden = t !== "papers";
+  $("#wsWiki").hidden = t !== "wiki";
+  if (t === "wiki") loadWiki();
+}
+$("#wsTabs").onclick = (e) => {
+  const b = e.target.closest("button[data-tab]");
+  if (b && b.dataset.tab !== wsTab) setWsTab(b.dataset.tab);
+};
+
+// 論文短標題：取冒號前那段（「BERT: Pre-training…」→「BERT」），太長就截斷
+const shortTitle = (t) => { t = String(t).split(/[:：]/)[0].trim(); return t.length > 26 ? t.slice(0, 24) + "…" : t; };
+
+/** 把 [[slug|字]]、[[paper:pid#pN]] 換成自己產生的標記；先用佔位字串躲過 marked / DOMPurify，所有內容都 escape。 */
+function renderWiki(el, md) {
+  const out = [];
+  const text = md.replace(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g, (_, target, label) => {
+    target = target.trim();
+    const c = /^paper:([^#\s]+)#p(\d+)$/.exec(target);
+    if (c) {
+      const p = wsPaperList.find((x) => x.id === c[1]);
+      const full = p ? p.title || p.filename : "論文";
+      out.push(`<button class="wcite" data-pid="${escapeHTML(c[1])}" data-page="${c[2]}" title="${escapeHTML(full)}，第 ${c[2]} 頁"
+        aria-label="開啟《${escapeHTML(full)}》第 ${c[2]} 頁">${escapeHTML(shortTitle(full))}<span class="wcp">p.${c[2]}</span></button>`);
+    } else {
+      out.push(`<a class="wref" href="#" data-slug="${escapeHTML(target)}">${escapeHTML(label?.trim() || target)}</a>`);
+    }
+    return `@@WL${out.length - 1}@@`;
+  });
+  renderMD(el, text);
+  el.innerHTML = el.innerHTML.replace(/@@WL(\d+)@@/g, (_, i) => out[i]);
+}
+
+async function loadWiki() {
+  const ws = curWs, page = $("#wikiPage");
+  let w;
+  try {
+    w = await api(`/api/workspaces/${ws.id}/wiki`);
+  } catch (e) {
+    page.innerHTML = `<p class="cards-empty err">讀不到這個 workspace 的 Wiki：${escapeHTML(e.message)}</p>`;
+    return;
+  }
+  if (curWs?.id !== ws.id) return;
+  $("#wikiPending").textContent = w.pending ? `${w.pending} 篇論文待整理` : w.pages.length ? "所有論文都已整理" : "";
+  $("#wikiUpdate").disabled = wikiBusy || !w.pending;
+  $("#wikiList").innerHTML = w.pages.map((p) => `<li><button class="witem${p.slug === "index" ? " home" : ""}" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</button></li>`).join("");
+  if (!w.pages.length) {
+    page.innerHTML = `<div class="wempty"><h3>這個 workspace 還沒有 Wiki</h3>
+      <p>按「更新 Wiki」，Lantern 會逐篇讀過這裡的論文，為每篇寫一頁重點，把反覆出現的方法、概念與資料集整理成跨論文的條目，最後寫一頁總覽串起全部。</p>
+      <p>每個說法都標著出處，點一下就回到論文的那一頁。之後加入新論文再按一次，只會整理新的那幾篇。</p>
+      ${w.pending ? "" : "<p>先到「論文」分頁加入論文，才有東西可以整理。</p>"}</div>`;
+    return;
+  }
+  await showWikiPage(w.pages.some((p) => p.slug === wikiSlug) ? wikiSlug : w.pages[0].slug);
+}
+
+async function showWikiPage(slug) {
+  const ws = curWs, page = $("#wikiPage");
+  let p;
+  try {
+    p = await api(`/api/workspaces/${ws.id}/wiki/${encodeURIComponent(slug)}`);
+  } catch (e) {
+    page.innerHTML = `<p class="cards-empty err">開不了「${escapeHTML(slug)}」這一頁：${escapeHTML(e.message)}</p>`;
+    return;
+  }
+  if (curWs?.id !== ws.id) return;
+  wikiSlug = slug;
+  $$("#wikiList .witem").forEach((b) => (b.dataset.slug === slug ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
+  page.innerHTML = `<h1 class="wtitle" tabindex="-1">${escapeHTML(p.title)}</h1><div class="wbody"></div>
+    <p class="wmeta">更新於 ${fmtDate(p.updated)}${p.sources?.length ? `，整理自 ${p.sources.length} 篇論文` : ""}</p>`;
+  renderWiki($(".wbody", page), p.markdown || "");
+}
+
+$("#wsWiki").onclick = async (e) => {
+  const l = e.target.closest("[data-slug]");
+  if (l) {
+    e.preventDefault();
+    await showWikiPage(l.dataset.slug);
+    const h = $("#wikiPage .wtitle");
+    if (h) { h.focus({ preventScroll: true }); if (h.getBoundingClientRect().top < 60) h.scrollIntoView({ block: "start" }); }
+    return;
+  }
+  const c = e.target.closest(".wcite");
+  if (!c) return;
+  try {
+    await openPaper(c.dataset.pid);
+    setTimeout(() => goToPage(+c.dataset.page - 1), 300);  // 同搜尋結果：等頁面排好再跳
+  } catch (err) {
+    showWs();
+    $("#wikiProg").innerHTML = `<span class="err">開不了這篇論文：${escapeHTML(err.message)}（可能已經被刪除）</span>`;
+  }
+};
+
+$("#wikiUpdate").onclick = async () => {
+  const ws = curWs, prog = $("#wikiProg"), bar = $("#wikiBar");
+  const here = () => curWs?.id === ws.id;
+  wikiBusy = true;
+  $("#wikiUpdate").disabled = true;
+  prog.textContent = "開始整理…";
+  bar.removeAttribute("value"); bar.hidden = false;
+  try {
+    await stream(`/api/workspaces/${ws.id}/wiki/update`, {}, (_, t) => {
+      let m;
+      try { m = JSON.parse(t); } catch { m = { msg: t }; }
+      if (!here()) return;
+      prog.textContent = m.msg || "";
+      bar.hidden = false;
+      if (m.total) { bar.max = m.total; bar.value = m.done || 0; }
+    });
+    if (here()) prog.textContent = "Wiki 已更新。";
+  } catch (e) {
+    if (here()) prog.innerHTML = `<span class="err">更新沒有完成：${escapeHTML(e.message)}。已整理好的論文會保留，再按一次「更新 Wiki」只做剩下的。</span>`;
+  }
+  wikiBusy = false;
+  bar.hidden = true;
+  if (here() && wsTab === "wiki") loadWiki();
 };
 
 $("#wsUpload").onclick = () => $("#wsFile").click();

@@ -1,9 +1,16 @@
 {
   "3": "db.py",
-  "4": "features.py",
-  "7": "retrieval.py",
+  "4": "pdf_parse.py",
+  "5": "llm.py",
+  "6": "features.py",
+  "7": "test_workspaces.py",
   "8": "fake_api.py",
   "13": "Lantern — 個人用 AI 論文閱讀器",
   "14": "CLAUDE.md",
-  "15": "conftest.py"
+  "15": "conftest.py",
+  "16": "test_units.py",
+  "17": "check",
+  "18": "_to_claude",
+  "19": "Workspace LLM Wiki（MVP）",
+  "20": "_ThinkStripper"
 }
