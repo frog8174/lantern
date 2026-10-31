@@ -16,6 +16,8 @@ API 一覽（前端 app.js 會呼叫）：
   POST   /api/papers/{id}/auto-highlight 自動標註
   GET    /api/papers/{id}/outline-ai     AI 產生大綱
   GET    /api/papers/{id}/reference/{n}  引用卡片
+  PATCH  /api/papers/{id}                標籤、備註、星號
+  GET    /api/papers/{id}/cite           複製引用（APA/IEEE/MLA/BibTeX）
   GET/POST/PATCH/DELETE .../annotations  螢光筆與註解
   /api/auth/*、/api/me、/api/workspaces…  測試登入與 workspace（見 docs/workspaces.md）
 
@@ -36,7 +38,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, features, llm, pdf_parse, retrieval
+from . import cite, config, db, features, llm, pdf_parse, retrieval
 from .pdf_parse import parse_pdf
 
 app = FastAPI(title="Paper Reader")
@@ -265,16 +267,34 @@ def paper_pdf(pid: str, uid: Uid):
     return FileResponse(_pdf_path(pid), media_type="application/pdf")
 
 
-class TagsIn(BaseModel):
-    tags: list[str]
+class TagsIn(BaseModel):  # 欄位都選填，只改有給的
+    tags: list[str] | None = None
+    note: str | None = Field(None, max_length=20000)
+    starred: bool | None = None
 
 
 @app.patch("/api/papers/{pid}")
 def edit_paper(pid: str, uid: Uid, body: TagsIn):
-    _paper_or_404(pid, uid)
-    tags = list(dict.fromkeys(t.strip() for t in body.tags if t.strip()))  # 去空白、去重複、保留順序
-    db.set_tags(pid, tags)
-    return {"tags": tags}
+    p = _paper_or_404(pid, uid)
+    tags = p["tags"] if body.tags is None else         list(dict.fromkeys(t.strip() for t in body.tags if t.strip()))  # 去空白、去重複、保留順序
+    note = (p["note"] or "") if body.note is None else body.note
+    starred = bool(p["starred"]) if body.starred is None else body.starred
+    db.update_paper(pid, tags, note, starred)
+    return {"tags": tags, "note": note, "starred": starred}
+
+
+@app.get("/api/papers/{pid}/cite")
+async def cite_paper(pid: str, uid: Uid):
+    """書目資料 + APA / IEEE / MLA / BibTeX。第一次才取書目並快取（docs/paper-cards.md）。"""
+    p = _paper_or_404(pid, uid)
+    bib = db.cache_get(pid, "bib")
+    if bib is None:
+        try:
+            bib = await features.fetch_bib(p)
+        except Exception as e:  # LLM 也失敗：回原因給前端，不寫快取
+            raise HTTPException(502, f"取得書目資料失敗：{e}")
+        db.cache_set(pid, "bib", bib)
+    return {"bib": bib, "styles": cite.styles(bib)}
 
 
 @app.get("/api/search")

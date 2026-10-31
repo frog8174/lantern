@@ -23,7 +23,8 @@ DB_PATH = config.DATA_DIR / "app.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS papers (
-  id TEXT PRIMARY KEY, user_id TEXT, filename TEXT, title TEXT, created REAL, meta TEXT, tags TEXT DEFAULT '[]'
+  id TEXT PRIMARY KEY, user_id TEXT, filename TEXT, title TEXT, created REAL, meta TEXT, tags TEXT DEFAULT '[]',
+  note TEXT DEFAULT '', starred INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS chunks (
   paper_id TEXT, idx INTEGER, page INTEGER, text TEXT, bbox TEXT, emb BLOB,
@@ -74,6 +75,12 @@ def init() -> None:
         # 舊資料庫升級：users 加上 settings 欄（JSON 物件）
         if "settings" not in {r["name"] for r in c.execute("PRAGMA table_info(users)")}:
             c.execute("ALTER TABLE users ADD COLUMN settings TEXT DEFAULT '{}'")
+        # papers 加上備註、星號（docs/paper-cards.md）
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(papers)")}
+        if "note" not in cols:
+            c.execute("ALTER TABLE papers ADD COLUMN note TEXT DEFAULT ''")
+        if "starred" not in cols:
+            c.execute("ALTER TABLE papers ADD COLUMN starred INTEGER DEFAULT 0")
         # 測試使用者：user id = 名字
         c.executemany("INSERT OR IGNORE INTO users (id, name, created) VALUES (?,?,?)",
                       [(u, u, time.time()) for u in config.TEST_USERS])
@@ -122,8 +129,11 @@ def get_paper(pid: str) -> dict | None:
 
 def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
     # tr_done / tr_total：已有對照翻譯快取的頁數 / 總頁數（給卡片上的進度圈）
-    sql = ("SELECT p.id, p.filename, p.title, p.created, p.tags, json_extract(p.meta, '$.num_pages') AS tr_total, "
-           "(SELECT COUNT(*) FROM cache k WHERE k.paper_id = p.id AND k.kind = 'block_translation') AS tr_done "
+    # year：有書目快取（/cite 取過）才有，否則 null
+    sql = ("SELECT p.id, p.filename, p.title, p.created, p.tags, p.note, p.starred, "
+           "json_extract(p.meta, '$.num_pages') AS tr_total, "
+           "(SELECT COUNT(*) FROM cache k WHERE k.paper_id = p.id AND k.kind = 'block_translation') AS tr_done, "
+           "(SELECT json_extract(k.value, '$.year') FROM cache k WHERE k.paper_id = p.id AND k.kind = 'bib') AS year "
            "FROM papers p ")
     args: tuple = (uid,)
     if workspace:
@@ -131,12 +141,14 @@ def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
         args = (workspace, uid)
     with conn() as c:
         rows = c.execute(sql + "WHERE p.user_id=? ORDER BY p.created DESC", args).fetchall()
-    return [{**dict(r), "tags": json.loads(r["tags"] or "[]")} for r in rows]
+    return [{**dict(r), "tags": json.loads(r["tags"] or "[]"), "note": r["note"] or "",
+             "starred": bool(r["starred"])} for r in rows]
 
 
-def set_tags(pid: str, tags: list[str]) -> None:
+def update_paper(pid: str, tags: list[str], note: str, starred: bool) -> None:
     with conn() as c:
-        c.execute("UPDATE papers SET tags=? WHERE id=?", (json.dumps(tags, ensure_ascii=False), pid))
+        c.execute("UPDATE papers SET tags=?, note=?, starred=? WHERE id=?",
+                  (json.dumps(tags, ensure_ascii=False), note, int(starred), pid))
 
 
 def search_chunks(uid: str, q: str, limit: int = 40) -> list[dict]:

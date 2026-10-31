@@ -13,8 +13,14 @@
   "17": "escapeHTML",
   "18": "多使用者論文庫 + Workspace（測試登入版）",
   "19": "drawHighlights",
+  "20": "cite.py",
   "21": "aiCard",
   "22": "streamInto",
   "23": "pumpTranslation",
-  "26": "drawOutline"
+  "24": "_ingest",
+  "25": "s2_paper_id",
+  "26": "drawOutline",
+  "27": "update_wiki",
+  "28": "time",
+  "29": "json"
 }

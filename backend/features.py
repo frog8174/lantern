@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import xml.etree.ElementTree as ET
 from typing import AsyncIterator
 
 import httpx
@@ -556,3 +557,85 @@ def _guess_ref_title(ref: str) -> str:
         return q.group(1)
     parts = [p.strip() for p in re.split(r"\.\s+", ref) if len(p.strip()) > 15]
     return parts[1] if len(parts) > 1 else ref[:150]
+
+
+# ---------------- 書目資料（複製引用，docs/paper-cards.md）----------------
+BIB_KEYS = ("title", "authors", "year", "venue", "volume", "issue", "pages", "doi", "url", "arxiv")
+MOCK_BIB = {"title": "MOCK Paper Title", "authors": [{"given": "Ada", "family": "Lovelace"},
+            {"given": "Alan", "family": "Turing"}], "year": 2024, "venue": "Mock Conference",
+            "volume": None, "issue": None, "pages": None, "doi": None, "url": None, "arxiv": None}
+
+
+def _name(full: str) -> dict:
+    given, _, family = (full or "").strip().rpartition(" ")
+    return {"given": given or None, "family": family}
+
+
+def _bib(**kw) -> dict:
+    """補齊所有欄位；空字串當 null，year 轉成整數。"""
+    b = {k: (kw.get(k) or None) for k in BIB_KEYS}
+    b["authors"] = [{"given": a.get("given") or None, "family": a["family"]}
+                    for a in (b["authors"] or []) if isinstance(a, dict) and a.get("family")]
+    y = re.search(r"\d{4}", str(b["year"] or ""))
+    b["year"] = int(y.group(0)) if y else None
+    return b
+
+
+async def _bib_arxiv(aid: str) -> dict | None:
+    async with httpx.AsyncClient(timeout=12) as client:
+        r = await client.get("https://export.arxiv.org/api/query", params={"id_list": aid})
+    if r.status_code != 200:
+        return None
+    ns = {"a": "http://www.w3.org/2005/Atom", "x": "http://arxiv.org/schemas/atom"}
+    e = ET.fromstring(r.text).find("a:entry", ns)
+    if e is None or "/abs/" not in e.findtext("a:id", "", ns):  # 查無此號時 arXiv 回一筆 Error entry
+        return None
+    return _bib(title=" ".join(e.findtext("a:title", "", ns).split()),
+                authors=[_name(a.findtext("a:name", "", ns)) for a in e.findall("a:author", ns)],
+                year=e.findtext("a:published", "", ns)[:4], doi=e.findtext("x:doi", None, ns),
+                url=f"https://arxiv.org/abs/{aid}", arxiv=aid)
+
+
+async def _bib_s2(title: str) -> dict | None:
+    r = await s2_get("/graph/v1/paper/search/match", params={
+        "query": title, "fields": "title,authors,year,venue,externalIds,journal,url"})
+    if r.status_code != 200:  # 404 找不到、429 限流 → 換下一個來源
+        return None
+    d = (r.json().get("data") or [{}])[0]
+    if not d.get("title"):
+        return None
+    j, ids = d.get("journal") or {}, d.get("externalIds") or {}
+    return _bib(title=d["title"], authors=[_name(a.get("name")) for a in d.get("authors") or []],
+                year=d.get("year"), venue=d.get("venue") or j.get("name"), volume=j.get("volume"),
+                pages=(j.get("pages") or "").strip(), doi=ids.get("DOI"), url=d.get("url"),
+                arxiv=ids.get("ArXiv"))
+
+
+async def _bib_llm(paper: dict) -> dict:
+    first = (paper["meta"]["pages"] or [""])[0][:4000]
+    prompt = ("以下是一篇論文第一頁的文字。抽出書目資料，只能用文字裡實際出現的內容，不得編造；沒看到的欄位填 null。\n\n"
+              f"{first}\n\n"
+              '只輸出 JSON：{"title": "...", "authors": [{"given": "名", "family": "姓"}], "year": 2020, '
+              '"venue": null, "volume": null, "issue": null, "pages": null, "doi": null, "url": null}')
+    data = await llm.complete_json([{"role": "user", "content": prompt}], task="cite", max_tokens=800)
+    data = data if isinstance(data, dict) else {}
+    return _bib(**{k: v for k, v in data.items() if k in BIB_KEYS and k != "arxiv"})
+
+
+async def fetch_bib(paper: dict) -> dict:
+    """順序：arXiv 匯入的 → arXiv API；否則標題查 Semantic Scholar；都失敗 → LLM 讀第一頁。"""
+    if config.LLM_MOCK:  # 測試、離線開發：不打網路
+        return dict(MOCK_BIB)
+    m = re.match(r"arXiv-(\d{4}\.\d{4,5})", paper["filename"] or "")
+    try:
+        if m:
+            b = await _bib_arxiv(m.group(1))
+            if b:
+                return b
+        if config.SEMANTIC_SCHOLAR_LOOKUP and paper["meta"]["title"]:
+            b = await _bib_s2(paper["meta"]["title"])
+            if b:
+                return b
+    except (httpx.HTTPError, ET.ParseError):
+        pass  # 沒網路 / 回應壞掉 → 交給 LLM
+    return await _bib_llm(paper)
