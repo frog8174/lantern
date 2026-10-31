@@ -195,12 +195,15 @@ async def chat_messages(paper: dict, history: list[dict], question: str, page: i
 
 
 # ---------------- 摘要 ----------------
-def summary_messages(paper: dict) -> list:
+def _paper_body(paper: dict) -> str:
     if full_text_fits(paper):
-        body = _pages_text(paper, range(paper["meta"]["num_pages"]))
-    else:  # 太長就取前段 + 結論附近
-        n = paper["meta"]["num_pages"]
-        body = _pages_text(paper, range(0, 3)) + "\n\n...\n\n" + _pages_text(paper, range(max(3, n - 3), n))
+        return _pages_text(paper, range(paper["meta"]["num_pages"]))
+    n = paper["meta"]["num_pages"]  # 太長就取前段 + 結論附近
+    return _pages_text(paper, range(0, 3)) + "\n\n...\n\n" + _pages_text(paper, range(max(3, n - 3), n))
+
+
+def summary_messages(paper: dict) -> list:
+    body = _paper_body(paper)
     return [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content":
@@ -208,6 +211,99 @@ def summary_messages(paper: dict) -> list:
             "## 一句話總結\n## 研究問題與動機\n## 方法（關鍵步驟條列）\n"
             "## 主要結果（盡量附數字與頁碼 [p.X]）\n## 貢獻與新穎之處\n## 限制與可延伸方向"},
     ]
+
+
+# ---------------- Workspace wiki（規格見 docs/wiki.md）----------------
+WIKI_RULES = (
+    f"你在維護一個研究主題的 wiki，用{LANG}寫 Markdown，專有名詞保留英文原文。"
+    "每個說法都要附原文引用，格式固定為 [[paper:<論文id>#p<頁碼>]]（頁碼從 1 起），例如 [[paper:abc123#p3]]。"
+    "連到其他 wiki 頁用 [[slug]] 或 [[slug|顯示文字]]。只根據提供的內容寫，不要編造。"
+)
+
+
+def _wiki_slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:60]
+
+
+def _wiki_source(paper: dict) -> str:
+    """論文取材：有快取的摘要就用（短又精），沒有就取全文或前後幾頁。"""
+    summary = db.cache_get(paper["id"], "summary")
+    return (f"論文 id：{paper['id']}\n{_header(paper)}\n\n"
+            + (f"摘要筆記：\n{summary}" if summary else _paper_body(paper)))
+
+
+def _strip_fence(text: str) -> str:
+    m = re.fullmatch(r"\s*```(?:markdown|md)?\s*\n(.*?)```\s*", text, re.S)
+    return (m.group(1) if m else text).strip()
+
+
+async def _wiki_plan(source: str, pages: list[dict]) -> dict:
+    existing = "\n".join(f"- {p['slug']}：{p['title']}" for p in pages) or "（還沒有）"
+    prompt = (f"{source}\n\n---\n現有 wiki 頁面：\n{existing}\n\n"
+              "請為這篇論文規劃 wiki 更新：\n"
+              "1. paper_page：這篇的論文頁，段落為問題、方法、結果、限制，並用 [[slug]] 連到相關概念頁。\n"
+              "2. concepts：這篇涉及的 2–5 個關鍵概念 / 方法 / 資料集。現有頁面裡有相同或同義概念的，"
+              "一定沿用它的 slug；新的 slug 用小寫英文 kebab-case（例：attention-mechanism）。"
+              "note 寫這篇對該概念的重點（含引用）。\n"
+              '只輸出 JSON：{"paper_page":{"title":"...","markdown":"..."},'
+              '"concepts":[{"slug":"...","title":"...","note":"..."}]}')
+    data = await llm.complete_json([{"role": "system", "content": WIKI_RULES},
+                                    {"role": "user", "content": prompt}], task="wiki", max_tokens=4000)
+    return data if isinstance(data, dict) else {}
+
+
+async def _wiki_concept(old: dict | None, slug: str, title: str, note: str, source: str) -> str:
+    prompt = (f"概念頁 [[{slug}]]（{title}）目前內容：\n{old['markdown'] if old else '（新頁面，還沒有內容）'}\n\n"
+              f"---\n新論文：\n{source}\n\n這篇對此概念的重點：{note}\n\n---\n"
+              "請輸出這個概念頁合併後的完整新版 Markdown（不是附加在後面）：定義、各論文怎麼用、比較、爭議。"
+              "舊內容的資訊與引用都要保留。第一行用「# 」寫頁名。只輸出 Markdown。")
+    return _strip_fence(await llm.complete([{"role": "system", "content": WIKI_RULES},
+                                            {"role": "user", "content": prompt}], task="wiki", max_tokens=4000))
+
+
+async def _wiki_index(pages: list[dict]) -> str:
+    listing = "\n".join(f"- [[{p['slug']}]]：{p['title']}\n  {p['markdown'][:300]}" for p in pages)
+    prompt = (f"wiki 現有頁面（含開頭內容）：\n{listing}\n\n---\n"
+              "請寫 wiki 首頁 Markdown：先一段這個 workspace 的主題概述，再把所有頁面分類列成目錄"
+              "（論文、概念、方法、資料集…），每項用 [[slug|標題]] 並附一句說明。第一行用「# 」寫標題。只輸出 Markdown。")
+    return _strip_fence(await llm.complete([{"role": "system", "content": WIKI_RULES},
+                                            {"role": "user", "content": prompt}], task="wiki", max_tokens=3000))
+
+
+async def update_wiki(wid: str) -> AsyncIterator[dict]:
+    """增量整理：每篇未整理的論文 → 規劃 → 論文頁 + 概念頁；全部做完重寫 index。
+    每篇做完就記 wiki_ingested，中斷後重跑只做剩下的。yield 進度 {"msg", "done", "total"}。"""
+    todo = db.wiki_pending(wid)
+    total = len(todo)
+    if not total:
+        yield {"msg": "沒有需要整理的新論文", "done": 0, "total": 0}
+        return
+    for i, pid in enumerate(todo):
+        paper = db.get_paper(pid)
+        name = paper["meta"]["title"] or paper["filename"]
+        yield {"msg": f"規劃：{name}", "done": i, "total": total}
+        source = _wiki_source(paper)
+        plan = await _wiki_plan(source, db.wiki_pages(wid))
+        pp = plan.get("paper_page") if isinstance(plan.get("paper_page"), dict) else {}
+        db.wiki_save(wid, f"paper-{pid}", str(pp.get("title") or name), str(pp.get("markdown") or ""), [pid])
+        for con in plan.get("concepts") or []:
+            if not isinstance(con, dict):
+                continue
+            slug = _wiki_slug(str(con.get("slug") or con.get("title") or ""))
+            if not slug or slug == "index" or slug.startswith("paper-"):
+                continue
+            old = db.wiki_page(wid, slug)
+            title = (old or {}).get("title") or str(con.get("title") or slug)
+            yield {"msg": f"更新概念頁：{title}", "done": i, "total": total}
+            md = await _wiki_concept(old, slug, title, str(con.get("note") or ""), source)
+            db.wiki_save(wid, slug, title, md, sorted(set((old or {}).get("sources", [])) | {pid}))
+        db.wiki_mark_ingested(wid, pid)
+        yield {"msg": f"完成：{name}", "done": i + 1, "total": total}
+    yield {"msg": "重寫首頁", "done": total, "total": total}
+    pages = [db.wiki_page(wid, p["slug"]) for p in db.wiki_pages(wid) if p["slug"] != "index"]
+    sources = sorted({s for p in pages for s in p["sources"]})
+    db.wiki_save(wid, "index", "首頁", await _wiki_index(pages), sources)
+    yield {"msg": "Wiki 已更新", "done": total, "total": total}
 
 
 # ---------------- 自動標註 ----------------
