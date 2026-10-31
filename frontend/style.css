@@ -540,7 +540,7 @@ body[data-view="login"] #userBox { display: none; }
 .cards-empty { grid-column: 1 / -1; color: var(--ink-2); margin: 0; padding: 14px 16px; border-radius: var(--radius); background: var(--card-bg); }
 /* 登入頁：置中的一疊名片 */
 #loginView .vinner { max-width: 760px; text-align: center; padding-top: 6vh; }
-#loginView .moon { margin-bottom: 14px; }
+.login-sis { margin-bottom: 10px; line-height: 0; }
 .users { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .users .card { align-items: center; text-align: center; padding: 26px 18px 20px; gap: 10px; }
 .uinit { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--rule-strong);
@@ -761,3 +761,19 @@ a.wref:hover { text-decoration-style: solid; }
 .sis.wm { position: absolute; right: -10px; bottom: -36px; }
 .cards-empty > :not(.sis), .wempty > :not(.sis) { position: relative; }
 @media (prefers-reduced-motion: reduce) { .sis i { animation: none !important; } }
+/* 失敗：石頭滾回坡底，靜態；石頭用 --ink-2，不用燈光色（燈光＝進行中） */
+.sis-fall .r { --m: url(img/sisyphus/fall_slope.png); }
+.sis-fall .f { --m: url(img/sisyphus/fall_fig.png); }
+.sis-fall .s { --m: url(img/sisyphus/fall_stone.png); background: var(--ink-2); }
+/* 登入頁的大推石：步伐放慢到 1.8s（只在這裡） */
+.sis.slow i { animation-duration: 1.8s; }
+.sis.slow .s { animation-duration: 1.8s, 5s; }
+/* 開大 PDF：第一頁畫好前蓋在閱讀區正中 */
+.vwait { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: var(--desk); }
+/* 小提示：不擋操作，右下角；連不上伺服器的那張放上方置中 */
+.toast { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; align-items: center; gap: 12px;
+  max-width: calc(100vw - 32px); padding: 8px 16px 8px 10px; border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); font-size: 14px; }
+.toast[hidden] { display: none; }
+.toast.offline { right: auto; bottom: auto; top: 16px; left: 50%; transform: translateX(-50%); width: max-content; color: var(--ink-2); }
