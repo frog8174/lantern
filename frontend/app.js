@@ -41,6 +41,7 @@ async function api(path, opts = {}) {
     ...opts,
     body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body,
   });
+  if (r.status === 401 && document.body.dataset.view !== "login") showLogin();  // 沒登入或登入失效
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
   return r.json();
 }
@@ -187,8 +188,7 @@ $("#libSearch").addEventListener("keydown", async (e) => {
 });
 $("#searchClose").onclick = () => { $("#searchOut").hidden = true; };
 
-async function ingest(promise) {
-  const st = $("#ingestStatus");
+async function ingest(promise, st = $("#ingestStatus")) {
   st.textContent = "解析中…（擷取文字、建立索引）";
   try {
     const res = await promise;
@@ -209,11 +209,15 @@ async function ingest(promise) {
   }
 }
 
-function uploadFile(file) {
+// ws：有帶就同時加入那個 workspace；st：顯示進度的元素
+function uploadFile(file, ws, st) {
   const fd = new FormData();
   fd.append("file", file);
-  ingest(api("/api/papers", { method: "POST", body: fd }));
+  if (ws) fd.append("workspace", ws);
+  ingest(api("/api/papers", { method: "POST", body: fd }), st);
 }
+const importArxiv = (url, ws, st) =>
+  ingest(api("/api/papers/arxiv", { method: "POST", body: ws ? { url, workspace: ws } : { url } }), st);
 $("#file").onchange = (e) => e.target.files[0] && uploadFile(e.target.files[0]);
 const drop = $("#drop");
 ["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
@@ -222,12 +226,13 @@ drop.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTrans
 $("#arxivForm").onsubmit = (e) => {
   e.preventDefault();
   const url = $("#arxivInput").value.trim();
-  if (url) ingest(api("/api/papers/arxiv", { method: "POST", body: { url } }));
+  if (url) importArxiv(url);
 };
 
 /* ---------------- 開啟論文、畫 PDF ---------------- */
 async function openPaper(id) {
   S.paper = await api(`/api/papers/${id}`);
+  setView("reader");
   S.annotations = await api(`/api/papers/${id}/annotations`);
   S.tr = {}; S.trQueue = []; S.figures = []; S.refs = [];
   api(`/api/papers/${id}/figures`).then((f) => { S.figures = f; }).catch(() => {});
@@ -1425,8 +1430,122 @@ $("#chatClear").onclick = async () => {
   loadChat();
 };
 
-/* ---------------- 啟動 ---------------- */
-loadLibrary().then(() => {
+/* ---------------- 畫面切換：登入 / 首頁 / workspace / 閱讀 ---------------- */
+// CSS 依 body[data-view] 決定顯示哪一頁（閱讀頁的工具列、側欄等在其他頁都收起來）
+const setView = (v) => { document.body.dataset.view = v; };
+let workspaces = [], curWs = null;  // curWs = 目前的 workspace；null = 全部論文
+
+async function showLogin() {
+  setView("login");
+  const g = $("#userGrid");
+  g.innerHTML = "";
+  try {
+    const users = await api("/api/auth/users");
+    g.innerHTML = users.length
+      ? users.map((u) => `<button class="card" data-id="${escapeHTML(u.id)}"><span class="uinit">${escapeHTML([...u.name][0])}</span>
+          <span class="cname">${escapeHTML(u.name)}</span></button>`).join("")
+      : '<p class="cards-empty">沒有可登入的測試使用者（請在 .env 設定 TEST_USERS）。</p>';
+  } catch (e) {
+    g.innerHTML = `<p class="cards-empty err">讀不到使用者清單：${escapeHTML(e.message)}</p>`;
+  }
+  $$("#userGrid .card").forEach((b) => (b.onclick = async () =>
+    enter(await api("/api/auth/login", { method: "POST", body: { user_id: b.dataset.id } }))));
+}
+
+async function enter(user) {
+  $("#userName").textContent = user.name;
   const id = location.hash.slice(1);
-  if (id) openPaper(id).catch(() => {});
-});
+  if (id) openPaper(id).catch(showHome); else showHome();
+}
+
+const tile = (id, name, n, cls = "") => `<button class="card ${cls}" data-id="${escapeHTML(id)}">
+  <span class="cname">${escapeHTML(name)}</span><span class="ccount">${n} 篇論文</span></button>`;
+
+async function showHome() {
+  setView("home");
+  history.replaceState(null, "", location.pathname);
+  [workspaces] = await Promise.all([api("/api/workspaces"), loadLibrary()]);
+  $("#wsGrid").innerHTML = tile("", "全部論文", library.length, "all")
+    + workspaces.map((w) => tile(w.id, w.name, w.count)).join("")
+    + '<button class="card new" data-new="1"><span class="plus">＋</span>新增 workspace</button>'
+    + (workspaces.length ? "" : '<p class="cards-empty">還沒有 workspace。按「＋ 新增 workspace」把論文依主題分類；論文本身都會留在「全部論文」。</p>');
+}
+$("#wsGrid").onclick = async (e) => {
+  const b = e.target.closest("button.card");
+  if (!b) return;
+  if (!b.dataset.new) return showWs(workspaces.find((w) => w.id === b.dataset.id) || null);
+  const name = prompt("新 workspace 的名稱（例如：RAG、待讀）")?.trim();
+  if (name) showWs(await api("/api/workspaces", { method: "POST", body: { name } }));
+};
+
+async function showWs(ws = curWs) {
+  curWs = ws;
+  setView("ws");
+  $("#wsTitle").textContent = ws ? ws.name : "全部論文";
+  $$("#wsView .ws-only").forEach((b) => (b.hidden = !ws));
+  $("#wsStatus").textContent = "";
+  const papers = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
+  const del = ws ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
+  $("#wsPapers").innerHTML = papers.map((p) => `<div class="card" data-id="${escapeHTML(p.id)}">
+      <button class="copen">${escapeHTML(p.title || p.filename)}</button>
+      ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
+      <span class="ccount">${fmtDate(p.created)}</span>
+      <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
+    || `<p class="cards-empty">${ws ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+}
+$("#wsPapers").onclick = async (e) => {
+  const id = e.target.closest(".card")?.dataset.id;
+  if (!id) return;
+  if (!e.target.closest(".cdel")) return openPaper(id);
+  if (curWs) await api(`/api/workspaces/${curWs.id}/papers/${id}`, { method: "DELETE" });
+  else if (confirm("刪除這篇論文與所有標註？")) await api(`/api/papers/${id}`, { method: "DELETE" });
+  else return;
+  showWs();
+};
+
+$("#wsUpload").onclick = () => $("#wsFile").click();
+$("#wsFile").onchange = (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";  // 同一個檔案再選一次也要觸發
+  if (f) uploadFile(f, curWs?.id, $("#wsStatus"));
+};
+$("#wsArxiv").onclick = () => {
+  const url = prompt("arXiv 編號或 PDF 網址")?.trim();
+  if (url) importArxiv(url, curWs?.id, $("#wsStatus"));
+};
+$("#wsAdd").onclick = async () => {
+  const inWs = new Set($$("#wsPapers .card").map((c) => c.dataset.id));
+  await loadLibrary();
+  const rest = library.filter((p) => !inWs.has(p.id));
+  $("#addList").innerHTML = rest.map((p) => `<li><button class="aitem" data-id="${escapeHTML(p.id)}">${escapeHTML(p.title || p.filename)}</button></li>`).join("")
+    || '<li class="muted small">所有論文都已經在這個 workspace 裡了。</li>';
+  $("#addDlg").showModal();
+};
+$("#addList").onclick = async (e) => {
+  const b = e.target.closest("button[data-id]");
+  if (!b) return;
+  await api(`/api/workspaces/${curWs.id}/papers`, { method: "POST", body: { paper_id: b.dataset.id } });
+  b.closest("li").remove();  // 對話框不關，可以連續加好幾篇
+  showWs();
+};
+$("#addClose").onclick = () => $("#addDlg").close();
+$("#wsRename").onclick = async () => {
+  const name = prompt("workspace 名稱", curWs.name)?.trim();
+  if (name && name !== curWs.name) showWs(await api(`/api/workspaces/${curWs.id}`, { method: "PATCH", body: { name } }));
+};
+$("#wsDelete").onclick = async () => {
+  if (!confirm(`刪除 workspace「${curWs.name}」？裡面的論文不會刪除，仍在「全部論文」。`)) return;
+  await api(`/api/workspaces/${curWs.id}`, { method: "DELETE" });
+  showHome();
+};
+$("#wsBack").onclick = showHome;
+$("#btnHome").onclick = showHome;
+$("#btnLogout").onclick = async () => {
+  await api("/api/auth/logout", { method: "POST" });
+  history.replaceState(null, "", location.pathname);
+  showLogin();
+};
+
+/* ---------------- 啟動 ---------------- */
+// 401 時 api() 已經切到登入頁；其他錯誤（例如伺服器沒開）也退回登入頁顯示錯誤
+api("/api/me").then(enter).catch(() => document.body.dataset.view || showLogin());

@@ -592,28 +592,6 @@
       "why": "connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "test_cache_breakpoint_only_for_multi_turn()",
-      "target": "_to_claude()",
-      "source_files": [
-        "tests/test_anthropic.py",
-        "backend/llm.py"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "calls",
-      "why": "connects across different repos/directories; peripheral node `test_cache_breakpoint_only_for_multi_turn()` unexpectedly reaches hub `_to_claude()`"
-    },
-    {
-      "source": "test_to_claude_conversion()",
-      "target": "_to_claude()",
-      "source_files": [
-        "tests/test_anthropic.py",
-        "backend/llm.py"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "calls",
-      "why": "connects across different repos/directories; peripheral node `test_to_claude_conversion()` unexpectedly reaches hub `_to_claude()`"
-    },
-    {
       "source": "test_parse_numeric()",
       "target": "parse_pdf()",
       "source_files": [
@@ -623,10 +601,65 @@
       "confidence": "EXTRACTED",
       "relation": "calls",
       "why": "connects across different repos/directories; peripheral node `test_parse_numeric()` unexpectedly reaches hub `parse_pdf()`"
+    },
+    {
+      "source": "test_scanned_detection()",
+      "target": "parse_pdf()",
+      "source_files": [
+        "tests/test_units.py",
+        "backend/pdf_parse.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; peripheral node `test_scanned_detection()` unexpectedly reaches hub `parse_pdf()`"
+    },
+    {
+      "source": "test_page_blocks_and_render()",
+      "target": "render_page_png()",
+      "source_files": [
+        "tests/test_units.py",
+        "backend/pdf_parse.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
     }
   ],
-  "tokens": {
-    "input": 18510,
-    "output": 6382
-  }
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `Lantern AI Paper Reader` connect `LLM Provider Client` to `Database and API Routes`, `PDF Parsing and Citations`, `AI Feature Prompts`, `Environment Configuration`?",
+      "why": "High betweenness centrality (0.334) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules` to the rest of the system?",
+      "why": "13 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Database and API Routes` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.05593008739076155 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `Lantern index.html` connect `Frontend UI Layout` to `Database and API Routes`?",
+      "why": "High betweenness centrality (0.029) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Frontend App Logic` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07081377151799687 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `sse()` connect `Anthropic Provider Tests` to `LLM Provider Client`, `Fake LLM API Server`?",
+      "why": "High betweenness centrality (0.025) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Anthropic Provider Tests` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.06721215663354763 - nodes in this community are weakly interconnected."
+    }
+  ]
 }

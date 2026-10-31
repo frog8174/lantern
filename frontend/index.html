@@ -34,6 +34,7 @@
 <header class="top">
   <button id="toggleLib" class="icon" title="論文庫 / 大綱">☰</button>
   <div class="brand">Lantern</div>
+  <button id="btnHome" class="tool reader-only" title="回到首頁">← 回論文庫</button>
   <div id="paperTitle" class="title"></div>
   <div class="tools">
     <div class="group">
@@ -53,7 +54,52 @@
     </div>
     <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
   </div>
+  <div id="userBox" class="userbox"><span id="userName"></span> · <button id="btnLogout" class="link small">登出</button></div>
 </header>
+
+<!-- 登入頁：測試登入，選一個使用者 -->
+<section id="loginView" class="view"><div class="vinner">
+  <div class="moon"></div>
+  <p class="eyebrow">Lantern</p>
+  <h2 class="vtitle">請問是哪一位讀者？</h2>
+  <p class="vlede">測試登入：免密碼，點一下名片就進入自己的論文庫。</p>
+  <div id="userGrid" class="cards users"></div>
+</div></section>
+
+<!-- 首頁：全部論文 + 各個 workspace -->
+<section id="homeView" class="view"><div class="vinner">
+  <div class="vhead"><div>
+    <p class="eyebrow">Library</p>
+    <h2 class="vtitle">論文庫</h2>
+    <p class="vlede">依主題分成 workspace；同一篇論文可以放進好幾個。</p>
+  </div></div>
+  <div id="wsGrid" class="cards tiles"></div>
+</div></section>
+
+<!-- workspace 頁（也用來顯示「全部論文」） -->
+<section id="wsView" class="view"><div class="vinner">
+  <div class="vhead">
+    <div>
+      <button id="wsBack" class="link small">← 回論文庫</button>
+      <h2 id="wsTitle" class="vtitle"></h2>
+    </div>
+    <div class="vacts">
+      <input type="file" id="wsFile" accept="application/pdf" hidden><button id="wsUpload" class="tool">上傳 PDF</button>
+      <button id="wsArxiv" class="tool">匯入 arXiv</button>
+      <button id="wsAdd" class="tool ws-only">加入既有論文</button>
+      <button id="wsRename" class="tool ws-only">改名</button>
+      <button id="wsDelete" class="tool ws-only">刪除 workspace</button>
+    </div>
+  </div>
+  <div id="wsStatus" class="muted small"></div>
+  <div id="wsPapers" class="cards papers"></div>
+</div></section>
+
+<!-- 「加入既有論文」：從其他論文挑一篇 -->
+<dialog id="addDlg" class="dlg">
+  <div class="row"><b>加入既有論文</b><button class="icon" id="addClose" title="關閉"><svg><use href="#i-close"/></svg></button></div>
+  <ul id="addList" class="list"></ul>
+</dialog>
 
 <main>
   <aside id="lib" class="lib">
