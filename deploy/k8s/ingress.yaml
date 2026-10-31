@@ -1,16 +1,17 @@
-# 以 ingress-nginx 為例；其他 Ingress controller 要換成對應的設定（見 docs/deploy.md）
+# Traefik。上傳大小（預設無上限）、SSE（預設不緩衝、即時轉送）、長串流（預設無寫入逾時）都不必另外設定。
+# 叢集層級要確認的事（Traefik 的 entrypoint 靜態設定，不在這份 YAML）見 docs/deploy.md「Traefik」。
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: lantern
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "160m"      # 上傳 PDF 上限 150 MB
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"   # SSE 串流（翻譯、問答、Wiki 更新）會開很久
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"       # SSE 不能被緩衝，否則字不會即時出現
-    # cert-manager.io/cluster-issuer: TODO                   # 用 cert-manager 自動簽憑證時打開
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # 二選一簽憑證：
+    # cert-manager.io/cluster-issuer: TODO                          # 用 cert-manager（spec.tls 的 secretName 會由它建立）
+    # traefik.ingress.kubernetes.io/router.tls.certresolver: TODO   # 用 Traefik 內建 ACME（這時可以拿掉 spec.tls.secretName）
 spec:
-  ingressClassName: nginx     # TODO: 叢集的 IngressClass
+  ingressClassName: traefik   # TODO: 確認叢集的 IngressClass 名稱（kubectl get ingressclass）
   tls:
     - hosts: [LANTERN_HOST]   # TODO: Lantern 公開網域
       secretName: lantern-tls
