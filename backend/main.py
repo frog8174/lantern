@@ -819,6 +819,15 @@ def wiki_ask_clear(wid: str, uid: Uid):
     return {"ok": True}
 
 
+@app.delete("/api/workspaces/{wid}/ask/{mid}")
+def wiki_ask_delete(wid: str, mid: int, uid: Uid):
+    """刪單一題（問題 id 來自 GET /ask），連同它的回答。"""
+    _ws_or_404(wid, uid)
+    if not db.delete_wiki_exchange(wid, mid):
+        raise HTTPException(404, "question not found")
+    return {"ok": True}
+
+
 @app.post("/api/workspaces/{wid}/ask/save")
 async def wiki_ask_save(wid: str, uid: Uid, body: QaIn):
     _ws_or_404(wid, uid)

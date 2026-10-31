@@ -1771,7 +1771,7 @@ async function loadAsk() {
   let q = "";
   for (const m of msgs) {
     if (m.role === "user") q = m.content;
-    addAsk(m.role, m.content, q);
+    addAsk(m.role, m.content, q, m.id);
   }
   const empty = !w.pages.length;
   $("#qaInput").disabled = $("#qaForm button").disabled = empty;
@@ -1782,14 +1782,15 @@ async function loadAsk() {
 }
 
 /** 一則問答：問題是可收合的條目標題（<details>），回答是一張羊皮紙放在同一個條目裡；
- *  q 是回答前那個問題（存成 Wiki 頁要一起送）。 */
-function addAsk(role, text, q) {
+ *  q 是回答前那個問題（存成 Wiki 頁要一起送）；id 是問題在伺服器上的編號（刪單題用）。 */
+function addAsk(role, text, q, id) {
   if (role === "user") {
     const item = document.createElement("details");
     item.className = "qitem";
     item.open = true;
-    item.innerHTML = '<summary class="qa user"></summary>';
-    item.firstChild.textContent = text;
+    if (id) item.dataset.id = id;
+    item.innerHTML = '<summary class="qa user"><span class="qtext"></span><button class="qdel" type="button" aria-label="刪除這一題">×</button></summary>';
+    $(".qtext", item).textContent = text;
     $("#askOut").appendChild(item);
     return item.firstChild;
   }
@@ -1827,7 +1828,8 @@ async function sendAsk(q) {
   const ws = curWs;
   askBusy = true;
   $("#askClear").hidden = false;
-  addAsk("user", q).scrollIntoView({ block: "start", behavior: "smooth" });
+  const head = addAsk("user", q);
+  head.scrollIntoView({ block: "start", behavior: "smooth" });
   const d = addAsk("assistant", ""), body = d.firstChild;
   body.classList.add("cursor");
   body.setAttribute("aria-busy", "true");  // 串完才念出整段，不要一個字一個字報
@@ -1835,6 +1837,9 @@ async function sendAsk(q) {
     const full = await stream(`/api/workspaces/${ws.id}/ask`, { body: { question: q } }, (t) => renderWiki(body, t));
     renderWiki(body, full);
     addSave(d, q, full);
+    // 串流不回編號：串完再查一次，拿最新那則問題的 id，這題才能單獨刪
+    const last = (await api(`/api/workspaces/${ws.id}/ask`)).findLast((m) => m.role === "user");
+    if (last) head.parentElement.dataset.id = last.id;
   } catch (e) {
     body.innerHTML = `<span class="err">${escapeHTML(e.message)}</span>`;
   } finally {
@@ -1865,7 +1870,26 @@ $("#askClear").onclick = async (e) => {
   await api(`/api/workspaces/${curWs.id}/ask`, { method: "DELETE" });
   loadAsk();
 };
-$("#wsAsk").onclick = (e) => {
+$("#wsAsk").onclick = async (e) => {
+  const del = e.target.closest(".qdel");
+  if (del) {  // 在 summary 裡：不要觸發收合；同「清空對話」，三秒內按第二下才刪
+    e.preventDefault();
+    const item = del.closest(".qitem");
+    if (!del.dataset.armed) {
+      del.dataset.armed = "1";
+      del.textContent = "再按一次刪除";
+      setTimeout(() => { delete del.dataset.armed; del.textContent = "×"; }, 3000);
+      return;
+    }
+    try {
+      await api(`/api/workspaces/${curWs.id}/ask/${item.dataset.id}`, { method: "DELETE" });
+      item.remove();
+      if (!$("#askOut .qitem")) $("#askClear").hidden = true;
+    } catch (err) {
+      del.textContent = "刪不掉";
+    }
+    return;
+  }
   if (e.target.closest("[data-go]")) return setWsTab("wiki");
   const l = e.target.closest("a[data-slug]");
   if (l) { e.preventDefault(); return openWikiPage(l.dataset.slug); }

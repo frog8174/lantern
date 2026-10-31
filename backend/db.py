@@ -270,9 +270,19 @@ def add_wiki_message(wid: str, role: str, content: str) -> None:
 
 def list_wiki_messages(wid: str, limit: int = 50) -> list[dict]:
     with conn() as c:
-        rows = c.execute("SELECT role, content FROM wiki_messages WHERE workspace_id=? ORDER BY id DESC LIMIT ?",
+        rows = c.execute("SELECT id, role, content FROM wiki_messages WHERE workspace_id=? ORDER BY id DESC LIMIT ?",
                          (wid, limit)).fetchall()
     return [dict(r) for r in reversed(rows)]
+
+
+def delete_wiki_exchange(wid: str, mid: int) -> bool:
+    """刪一題問答：這則問題，加上它到下一個問題之前的回答。"""
+    with conn() as c:
+        if not c.execute("SELECT 1 FROM wiki_messages WHERE id=? AND workspace_id=? AND role='user'", (mid, wid)).fetchone():
+            return False
+        nxt = c.execute("SELECT MIN(id) FROM wiki_messages WHERE workspace_id=? AND role='user' AND id>?", (wid, mid)).fetchone()[0]
+        c.execute("DELETE FROM wiki_messages WHERE workspace_id=? AND id>=? AND id<?", (wid, mid, nxt or 2**62))
+    return True
 
 
 def clear_wiki_messages(wid: str) -> None:

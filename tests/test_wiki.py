@@ -66,8 +66,13 @@ def test_wiki_ask_and_backlinks(client, bob, pdfs, monkeypatch):
 
     text, _, err = sse(client, "POST", ask, {"question": "這篇在做什麼？"})
     assert err is None and text
-    assert client.get(ask).json() == [{"role": "user", "content": "這篇在做什麼？"},
-                                      {"role": "assistant", "content": text}]
+    hist = client.get(ask).json()
+    assert [(m["role"], m["content"]) for m in hist] == [("user", "這篇在做什麼？"), ("assistant", text)]
+    sse(client, "POST", ask, {"question": "第二題"})
+    assert bob.delete(f"{ask}/{hist[0]['id']}").status_code == 404
+    assert client.delete(f"{ask}/{hist[0]['id']}").json() == {"ok": True}  # 只刪第一題（問題 + 回答）
+    assert [m["content"] for m in client.get(ask).json() if m["role"] == "user"] == ["第二題"]
+    assert client.delete(f"{ask}/{hist[0]['id']}").status_code == 404
     assert client.delete(ask).json() == {"ok": True} and client.get(ask).json() == []
 
     r = client.post(ask + "/save", json={"question": "Q", "answer": f"A [[paper:{pid}#p1]] [[paper:zzz#p2]]"}).json()

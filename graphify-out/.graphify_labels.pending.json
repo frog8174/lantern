@@ -5,7 +5,7 @@
   "4": "pdf_parse.py",
   "5": "llm.py",
   "6": "features.py",
-  "7": "_ingest",
+  "7": "retrieval.py",
   "8": "fake_api.py",
   "13": "Lantern — 個人用 AI 論文閱讀器",
   "14": "CLAUDE.md",
@@ -23,12 +23,9 @@
   "26": "drawOutline",
   "27": "update_wiki",
   "28": "get_user",
-  "29": "_block_translation",
-  "30": "complete_json",
-  "31": "chat_messages",
-  "32": "s2_get",
-  "33": "local_context",
-  "34": "論文卡：備註、星號、排序、複製引用",
-  "35": "paintWsCards",
-  "36": "auto_highlight"
+  "29": "_ingest",
+  "30": "Uid",
+  "31": "import_url",
+  "32": "json",
+  "35": "paintWsCards"
 }

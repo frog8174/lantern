@@ -600,6 +600,16 @@ a.wref:hover { text-decoration-style: solid; }
 .qitem[open] > summary::before { transform: rotate(90deg); }
 .qitem > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .qitem:not([open]) > summary { margin-bottom: 0; opacity: .75; }
+/* 單題刪除：在問題標題右側，平常淡、移上去或聚焦才明顯；還沒拿到編號（回答中）就不顯示 */
+.qitem > summary { display: flex; align-items: baseline; gap: 10px; }
+.qitem > summary::before { flex: none; }
+.qitem .qtext { flex: 1; min-width: 0; }
+.qdel { flex: none; min-width: var(--tap); min-height: var(--tap); padding: 0 8px; border: none; background: none; color: var(--ink-2);
+  font-family: var(--font-text); font-style: normal; font-weight: 400; font-size: 13px; opacity: .45; }
+.qitem > summary:hover .qdel, .qdel:focus-visible, .qdel[data-armed] { opacity: 1; }
+.qdel[data-armed] { color: var(--oxblood); }
+@media (hover: none) { .qdel { opacity: .8; } }
+.qitem:not([data-id]) .qdel { display: none; }
 @media (prefers-reduced-motion: reduce) { .qitem > summary::before { transition: none; } }
 .qa.assistant { background: var(--vellum); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-page);
   padding: clamp(16px, 3.5vw, 32px) clamp(16px, 4vw, 40px) 10px; min-width: 0; }
