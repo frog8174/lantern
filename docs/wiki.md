@@ -56,3 +56,37 @@ wiki_ingested (workspace_id, paper_id, ingested REAL, PRIMARY KEY (workspace_id,
 
 ## 這次不做
 用 wiki 回答問題、定期一致性檢查、使用者編輯、論文移出 workspace 時改寫頁面、頁面版本紀錄。
+
+---
+
+# 第二階段：Wiki 問答、自動更新、反向連結
+
+## 1. Wiki 問答（workspace 第三個分頁「論文｜Wiki｜問答」）
+**流程（先查 wiki，不做向量 RAG）**
+1. 頁面挑選：wiki 全文估計放得進 context（沿用 features 的 token 估算與 `LLM_CONTEXT_TOKENS` 規則）就全部帶上；
+   放不下就把每頁 slug、title、前 300 字給 LLM，請它挑最多 6 頁（`complete_json`）。
+2. 補原文：從挑中頁面的 `sources` 論文，用 `retrieval.search(pid, question, k=4)` 各取段落，標成 `[[paper:<pid>#p<n>]]` 可引用的來源。
+3. 回答：系統規則同 `WIKI_RULES`（語言、引用、連結格式、不捏造；wiki 沒寫到就明說）；可用 `[[slug]]` 指向 wiki 頁。
+   帶最近 10 則對話。task 名稱 `wiki`（沿用 `LLM_MODEL_WIKI`）。
+
+**資料表**：`wiki_messages (id INTEGER PK AUTOINCREMENT, workspace_id, role, content, created)`；刪 workspace 一併刪。
+
+**API**
+| 方法 | 路徑 | 說明 |
+|---|---|---|
+| POST | `/api/workspaces/{wid}/ask` | body `{question}`。SSE，和單篇聊天一樣每則 `{"t": 文字片段}`，串完寫入 wiki_messages（user + assistant）。wiki 沒有任何頁面 → 400「先按更新 Wiki」 |
+| GET | `/api/workspaces/{wid}/ask` | `[{role, content}]` 最近 50 則，舊到新 |
+| DELETE | `/api/workspaces/{wid}/ask` | 清空對話 `{ok: true}` |
+| POST | `/api/workspaces/{wid}/ask/save` | body `{question, answer}` → LLM 把這則問答整理成一頁 wiki（保留引用），slug `qa-<new_id>`，title 用 LLM 給的短標題，sources = 答案引用到的 pid。回 `{slug, title}` |
+
+**前端**：問答分頁＝對話串（沿用單篇聊天的樣式與 markdown 渲染）、輸入框、清空按鈕。回答裡 `[[slug]]` 點了切到 Wiki 分頁該頁；
+`[[paper:…]]` 引用同 Wiki 頁的引用標記。每則回答底下「存成 Wiki 頁」→ 成功後提示並可點過去。wiki 沒頁面時顯示引導（去 Wiki 分頁按更新）。
+
+## 2. 加入論文就自動更新 Wiki（使用者設定）
+- `/api/me/settings` 多一個 `auto_wiki: bool`（預設 false），設定視窗多一個勾選項。
+- 開啟時：論文加入某 workspace（上傳/arXiv 帶 workspace、或 `POST /api/workspaces/{wid}/papers`）→ 該 workspace 沒在跑就啟動同一個背景更新任務；
+  在跑的話，任務結束前若又有 pending 且設定仍開著，就接著再跑一輪（直到沒有 pending）。
+
+## 3. 閱讀頁反向連結
+- `GET /api/papers/{pid}/wiki` → `[{workspace_id, workspace_name, slug, title}]`：使用者自己的 workspace 中，sources 含這篇的 wiki 頁（論文頁排最前）。
+- 前端：閱讀頁右側「摘要」分頁底下加一段「在 Wiki 中」（沒有就不顯示），點了回到該 workspace 的 Wiki 分頁並打開那頁。
