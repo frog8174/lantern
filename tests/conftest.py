@@ -82,6 +82,18 @@ def client(fake_server):
 
     from backend.main import app
     with TestClient(app) as c:
+        assert c.post("/api/auth/login", json={"user_id": "alice"}).status_code == 200  # 預設以 alice 登入
+        yield c
+
+
+@pytest.fixture
+def bob(fake_server):
+    """另一個使用者（bob）的連線，測範圍限制用。"""
+    from fastapi.testclient import TestClient
+
+    from backend.main import app
+    with TestClient(app) as c:
+        c.post("/api/auth/login", json={"user_id": "bob"})
         yield c
 
 

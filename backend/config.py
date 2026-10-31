@@ -96,5 +96,10 @@ SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "")
 # 設為 true 時不呼叫任何模型，回傳假資料，方便開發前端。
 LLM_MOCK = _bool("LLM_MOCK", False)
 
+# ---- 登入 ----
+# dev：測試登入（選使用者、免密碼，cookie 未簽章），只能自己開發用
+AUTH_MODE = os.environ.get("AUTH_MODE", "dev").lower()
+TEST_USERS = [u.strip() for u in os.environ.get("TEST_USERS", "alice,bob").split(",") if u.strip()]
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 (DATA_DIR / "pdfs").mkdir(exist_ok=True)
