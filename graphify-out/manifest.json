@@ -107,5 +107,23 @@
     "seen": 1793439594.8534832,
     "ast_hash": "6c5a0031158d3c50fa5321ef93288d1b",
     "semantic_hash": "6c5a0031158d3c50fa5321ef93288d1b"
+  },
+  "CLAUDE.md": {
+    "mtime": 1793439580.1597223,
+    "seen": 1793440211.3783207,
+    "ast_hash": "67d88e9d0760c3ba54c75dfd9551c1c5",
+    "semantic_hash": "67d88e9d0760c3ba54c75dfd9551c1c5"
+  },
+  "README.md": {
+    "mtime": 1793372918.5940893,
+    "seen": 1793440211.3783207,
+    "ast_hash": "580af202fd8352fd7fba58091870abbc",
+    "semantic_hash": "580af202fd8352fd7fba58091870abbc"
+  },
+  "frontend/index.html": {
+    "mtime": 1793374360.9739234,
+    "seen": 1793440211.3783207,
+    "ast_hash": "043a42b3268df162557ec1b20e001da6",
+    "semantic_hash": "043a42b3268df162557ec1b20e001da6"
   }
 }
