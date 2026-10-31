@@ -6,7 +6,8 @@
  *   每頁旁邊另有一個 .twin（並排翻譯用的譯文頁），平常隱藏。
  *
  * 互動（仿 Moonlight）：選字 → 浮動工具列（解釋 / 螢光筆 / 翻譯 / 註解 / Ask AI）→ 浮動 AI 卡片；
- * 解釋、標註、註解都記在右側「活動面板」；聊天是右下角的浮動視窗。
+ * 右側面板四個分頁：讀懂（摘要、解釋紀錄、聊天）｜我的筆記｜文獻｜Wiki。
+ * PDF 區的捲軸換成「頁面導軌」（#rail），縮放與頁碼是右下角的浮動小控制。
  */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -118,7 +119,8 @@ function caretAt(x, y) {
 }
 
 /* ---------------- 論文庫 ---------------- */
-let library = [], tagFilter = null;
+// sideList：閱讀頁左欄列的論文＝這篇所在研究主題的論文（從「全部論文」開的就是全部）
+let library = [], tagFilter = null, sideList = [];
 
 async function loadLibrary() {
   library = await api("/api/papers");
@@ -128,7 +130,7 @@ async function loadLibrary() {
 function renderLibrary() {
   const q = $("#libSearch").value.trim().toLowerCase();
   // 標籤列：所有用過的標籤，點一下只看那個標籤
-  const tags = [...new Set(library.flatMap((p) => p.tags))].sort();
+  const tags = [...new Set(sideList.flatMap((p) => p.tags))].sort();
   if (tagFilter && !tags.includes(tagFilter)) tagFilter = null;
   $("#tagBar").innerHTML = tags.map((t) =>
     `<button class="chip ${t === tagFilter ? "on" : ""}" data-tag="${escapeHTML(t)}">#${escapeHTML(t)}</button>`).join("");
@@ -138,30 +140,36 @@ function renderLibrary() {
 
   const ul = $("#paperList");
   ul.innerHTML = "";
-  const shown = library.filter((p) => (!tagFilter || p.tags.includes(tagFilter))
+  const shown = sideList.filter((p) => (!tagFilter || p.tags.includes(tagFilter))
     && (!q || `${p.title} ${p.filename} ${p.tags.join(" ")}`.toLowerCase().includes(q)));
-  if (!library.length) ul.innerHTML = '<li class="muted small">還沒有論文</li>';
+  if (!sideList.length) ul.innerHTML = '<li class="muted small">還沒有論文</li>';
   else if (!shown.length) ul.innerHTML = '<li class="muted small">沒有符合的論文；按 Enter 搜尋全文</li>';
   for (const p of shown) {
     const li = document.createElement("li");
     li.dataset.id = p.id;
     li.innerHTML = `<div class="ptitle"><span>${escapeHTML(p.title || p.filename)}</span>
         ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `<span>#${escapeHTML(t)}</span>`).join(" ")}</div>` : ""}</div>
-      <button class="del tagbtn" data-k="tag" title="編輯標籤">#</button><button class="del" data-k="del" title="刪除">×</button>`;
-    if (S.paper && S.paper.id === p.id) li.classList.add("on");
+      <button class="del tagbtn" data-k="tag" title="編輯標籤">#</button>`;
+    if (S.paper && S.paper.id === p.id) { li.classList.add("on"); li.setAttribute("aria-current", "page"); }
     li.onclick = async (e) => {
       const k = e.target.dataset.k;
-      if (k === "del") {
-        if (confirm("刪除這篇論文與所有標註？")) api(`/api/papers/${p.id}`, { method: "DELETE" }).then(loadLibrary);
-      } else if (k === "tag") {
+      if (k === "tag") {
         const v = prompt("標籤（用逗號分隔，例如：NLP, 待讀）", p.tags.join(", "));
         if (v === null) return;
         p.tags = (await api(`/api/papers/${p.id}`, { method: "PATCH", body: { tags: v.split(/[,，]/) } })).tags;
         renderLibrary();
-      } else openPaper(p.id);
+      } else { mainEl.classList.remove("showlib"); openPaper(p.id); }
     };
     ul.appendChild(li);
   }
+}
+async function loadSideList() {
+  const ws = S.fromWs;
+  $("#sideHead").textContent = ws ? "同主題的論文" : "全部論文";
+  const list = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
+  if (S.fromWs !== ws) return;  // 等的時候又換了來源
+  sideList = list;
+  renderLibrary();
 }
 
 $("#libSearch").addEventListener("input", renderLibrary);
@@ -218,21 +226,16 @@ function uploadFile(file, ws, st) {
 }
 const importArxiv = (url, ws, st) =>
   ingest(api("/api/papers/arxiv", { method: "POST", body: ws ? { url, workspace: ws } : { url } }), st);
-$("#file").onchange = (e) => e.target.files[0] && uploadFile(e.target.files[0]);
-const drop = $("#drop");
-["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("over")));
-drop.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
-$("#arxivForm").onsubmit = (e) => {
-  e.preventDefault();
-  const url = $("#arxivInput").value.trim();
-  if (url) importArxiv(url);
-};
 
 /* ---------------- 開啟論文、畫 PDF ---------------- */
 async function openPaper(id) {
   S.paper = await api(`/api/papers/${id}`);
+  // 從研究主題頁（或它的 Wiki）打開才記下來源；在閱讀頁裡換篇沿用原來的
+  if (document.body.dataset.view !== "reader") S.fromWs = curWs;
   setView("reader");
+  $("#backName").textContent = S.fromWs?.name || "全部論文";
+  $("#btnHome").setAttribute("aria-label", `回到${S.fromWs ? `研究主題「${S.fromWs.name}」` : "全部論文"}`);
+  loadSideList().catch(() => {});
   S.annotations = await api(`/api/papers/${id}/annotations`);
   S.tr = {}; S.trQueue = []; S.figures = []; S.refs = [];
   api(`/api/papers/${id}/figures`).then((f) => { S.figures = f; }).catch(() => {});
@@ -240,7 +243,6 @@ async function openPaper(id) {
   $("#paperTitle").textContent = S.paper.title;
   $("#empty").hidden = true;
   $("#pageTotal").textContent = `/ ${S.paper.num_pages}`;
-  $$("#paperList li").forEach((li) => li.classList.toggle("on", li.dataset.id === id));
   renderOutline(S.paper.outline);
   S.pdf = await pdfjsLib.getDocument(`/api/papers/${id}/pdf`).promise;
   buildPages();
@@ -250,8 +252,7 @@ async function openPaper(id) {
   loadPaperWiki(id);
   $("#relatedList").innerHTML = '<li class="muted small">按上方按鈕取得推薦（資料來自 Semantic Scholar）。</li>';
   closeAiCard();
-  chatLoaded = false;
-  if (!$("#chatWin").hidden) loadChat();
+  loadChat();
   history.replaceState(null, "", `#${id}`);
 }
 
@@ -292,6 +293,7 @@ function buildPages() {
   fin.innerHTML = `<div class="fin-mark">Finis</div><p>${escapeHTML(FIN_LINES[Math.floor(Math.random() * FIN_LINES.length)])}</p>`;
   wrap.appendChild(fin);
   $("#zoomLabel").textContent = `${Math.round(S.scale * 100)}%`;
+  drawRail();
 }
 
 const FIN_LINES = [
@@ -362,7 +364,7 @@ function drawHighlights(i) {
       m.style.top = `${y0 * 100}%`;
       m.title = a.comment;
       m.innerHTML = icon("comment");
-      m.onclick = () => { openPanel("comments"); flashItem(a.id); };
+      m.onclick = () => { openPanel("notes"); flashItem(a.id); };
       layer.appendChild(m);
     }
   }
@@ -378,7 +380,7 @@ function visibleOnPage(a) {
 function goToPage(i, flashId) {
   const pg = S.pages[i];
   if (!pg) return;
-  pg.el.scrollIntoView({ behavior: "smooth", block: "start" });
+  pg.el.scrollIntoView({ behavior: calmMotion.matches ? "auto" : "smooth", block: "start" });
   if (flashId) setTimeout(() => {
     $$(`.hl[data-id="${flashId}"]`).forEach((d) => { d.classList.add("flash"); setTimeout(() => d.classList.remove("flash"), 1600); });
   }, 500);
@@ -390,7 +392,71 @@ $("#viewer").addEventListener("scroll", () => {
     if (pg.el.getBoundingClientRect().bottom > top) { S.current = i; break; }
   }
   if (document.activeElement !== $("#pageInput")) $("#pageInput").value = S.current + 1;
+  syncRail();
+  markOutline();
 }, { passive: true });
+
+/* ---------------- 頁面導軌：取代閱讀區的捲軸 ----------------
+ * 座標都取自 #viewer 這個真正的捲動容器：導軌高度 ↔ scrollHeight。滾輪、觸控板、鍵盤照常捲 #viewer，
+ * 導軌只跟著畫。刻度＝有螢光筆或註解的頁，放在那頁最上面一個標註的位置。 */
+const viewerEl = $("#viewer"), rail = $("#rail");
+const calmMotion = matchMedia("(prefers-reduced-motion: reduce)");
+function drawRail() {
+  if (!S.pages.length) return;
+  const H = viewerEl.scrollHeight || 1, top = new Map();
+  for (const a of S.annotations) {
+    if ((a.kind === "user" || a.kind === "comment") && a.rects[0]) top.set(a.page, Math.min(top.get(a.page) ?? 1, a.rects[0][1]));
+  }
+  $(".rticks", rail).innerHTML = [...top].map(([p, y]) => {
+    const el = S.pages[p]?.el;  // .page 的 offsetParent 是 #viewer（position: relative），offsetTop 就是捲動座標
+    return el ? `<button class="rtick" tabindex="-1" data-page="${p}" aria-label="跳到第 ${p + 1} 頁（有標註）"
+      style="top:${((el.offsetTop + y * el.offsetHeight) / H) * 100}%"></button>` : "";
+  }).join("");
+  $(".rend", rail).textContent = S.pages.length;
+  rail.setAttribute("aria-valuemax", S.pages.length);
+  syncRail();
+}
+function syncRail() {
+  const H = viewerEl.scrollHeight || 1, n = S.pages.length, cur = S.current + 1;
+  const top = (viewerEl.scrollTop / H) * 100, h = Math.min(100, (viewerEl.clientHeight / H) * 100);
+  Object.assign($(".rlamp", rail).style, { top: `${top}%`, height: `${h}%` });
+  const lab = $(".rcur", rail);
+  lab.textContent = cur;
+  lab.style.top = `${Math.min(97, Math.max(3, top + h / 2))}%`;
+  rail.classList.toggle("at-start", top + h / 2 < 8);
+  rail.classList.toggle("at-end", top + h / 2 > 92);
+  rail.setAttribute("aria-valuenow", cur);
+  rail.setAttribute("aria-valuetext", `第 ${cur} 頁，共 ${n} 頁`);
+}
+rail.addEventListener("pointerdown", (e) => {
+  if (!S.pages.length || e.button !== 0) return;
+  const tick = e.target.closest(".rtick");
+  if (tick) { e.preventDefault(); return goToPage(+tick.dataset.page); }
+  e.preventDefault();
+  rail.focus({ preventScroll: true, focusVisible: false });
+  const r = rail.getBoundingClientRect(), k = viewerEl.scrollHeight / r.height;
+  // 點軌道：那個位置移到畫面中間；點在燈光段上就不跳。接著按住不放都能拖
+  if (!e.target.closest(".rlamp")) viewerEl.scrollTop = (e.clientY - r.top) * k - viewerEl.clientHeight / 2;
+  const y0 = e.clientY, s0 = viewerEl.scrollTop;
+  const move = (ev) => { viewerEl.scrollTop = s0 + (ev.clientY - y0) * k; };
+  rail.setPointerCapture(e.pointerId);
+  rail.classList.add("dragging");
+  rail.addEventListener("pointermove", move);
+  rail.addEventListener("lostpointercapture", () => {
+    rail.removeEventListener("pointermove", move);
+    rail.classList.remove("dragging");
+  }, { once: true });
+});
+rail.addEventListener("keydown", (e) => {
+  const n = S.pages.length, c = S.current;
+  const to = { ArrowDown: c + 1, ArrowRight: c + 1, PageDown: c + 1, ArrowUp: c - 1, ArrowLeft: c - 1, PageUp: c - 1, Home: 0, End: n - 1 }[e.key];
+  if (to == null || !n) return;
+  e.preventDefault();
+  // 直接跳（不平滑）：連按時 S.current 才跟得上
+  S.pages[Math.max(0, Math.min(n - 1, to))].el.scrollIntoView({ block: "start" });
+});
+// 視窗或面板寬度變了：scrollHeight 跟著變，刻度位置要重算
+new ResizeObserver(() => drawRail()).observe(viewerEl);
 
 $("#pageInput").addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || !S.paper) return;
@@ -409,11 +475,16 @@ function zoom(f) {
 }
 $("#btnZoomIn").onclick = () => zoom(1.15);
 $("#btnZoomOut").onclick = () => zoom(1 / 1.15);
-$("#toggleLib").onclick = () => {
-  const m = $("main");
-  if (innerWidth <= 1100) m.classList.toggle("showlib"); else m.classList.toggle("nolib");
-};
+// 窄螢幕的左欄抽屜
+function setLibDrawer(on) {
+  $("main").classList.toggle("showlib", on);
+  $("#toggleLib").setAttribute("aria-expanded", on);
+  if (on) $("#lib").focus();
+}
+$("#toggleLib").onclick = () => setLibDrawer(!$("main").classList.contains("showlib"));
 $("#togglePanel").onclick = () => $("main").classList.toggle("nopanel");
+// 手機寬度：面板預設收起，要看時從頂列的面板鈕叫出來
+if (innerWidth < 700) $("main").classList.add("nopanel");
 
 /* ---------------- 活動面板：拖曳左緣調寬、彈出成浮動視窗 ---------------- */
 const mainEl = $("main"), panelEl = $(".panel");
@@ -462,13 +533,21 @@ function drawOutline() {
     if (hidden) continue;
     const li = document.createElement("li");
     li.dataset.level = Math.min(3, it.level);
+    li.dataset.page = it.page;
     li.innerHTML = `<span class="caret">${it.parent ? (it.open ? "▾" : "▸") : ""}</span><span>${escapeHTML(it.title)}</span>`;
     li.onclick = (e) => {
       if (e.target.classList.contains("caret") && it.parent) { it.open = !it.open; drawOutline(); }
-      else goToPage(it.page);
+      else { setLibDrawer(false); goToPage(it.page); }
     };
     ul.appendChild(li);
   }
+  markOutline();
+}
+/** 目前章節：看得到的大綱項目裡，最後一個起始頁不超過目前頁的那個，用燈光色標示。 */
+function markOutline() {
+  const items = $$("#outline li[data-page]");
+  const cur = items.filter((li) => +li.dataset.page <= S.current).pop();
+  items.forEach((li) => (li === cur ? li.setAttribute("aria-current", "location") : li.removeAttribute("aria-current")));
 }
 $("#btnAiOutline").onclick = async () => {
   if (!S.paper) return;
@@ -522,6 +601,7 @@ document.addEventListener("mouseup", (e) => {
     lastSel = readSelection();
     if (!lastSel) { selBar.hidden = true; return; }
     const b = lastSel.box;
+    $("#askInput").hidden = true;
     selBar.hidden = false;
     const w = selBar.offsetWidth;
     selBar.style.left = `${Math.min(innerWidth - w - 8, Math.max(8, b.left + b.width / 2 - w / 2))}px`;
@@ -533,12 +613,19 @@ document.addEventListener("mousedown", (e) => {
   if (!$("#ctxMenu").contains(e.target)) $("#ctxMenu").hidden = true;
   if (!$("#citeCard").contains(e.target)) $("#citeCard").hidden = true;
   if (!$("#figCard").contains(e.target)) $("#figCard").hidden = true;
+  if (mainEl.classList.contains("showlib") && !e.target.closest("#lib, #toggleLib")) setLibDrawer(false);
 });
 
 selBar.addEventListener("click", (e) => {
   const sw = e.target.closest("[data-color]");
   if (sw) { S.hlColor = sw.dataset.color === "custom" ? customColor : sw.dataset.color; return selAction("highlight"); }
   const b = e.target.closest("[data-act]");
+  if (b?.dataset.act === "ask") {  // 「問 AI」：在工具列上展開輸入框
+    const ask = $("#askInput");
+    ask.hidden = false;
+    selBar.style.left = `${Math.max(8, Math.min(innerWidth - selBar.offsetWidth - 8, parseFloat(selBar.style.left)))}px`;
+    return ask.focus();
+  }
   if (b) selAction(b.dataset.act);
 });
 $("#askInput").addEventListener("keydown", (e) => {
@@ -577,7 +664,7 @@ async function selAction(act, question = "") {
 // 快捷鍵：選字後按 E 解釋、H 螢光筆、T 翻譯、C 註解；Esc 關閉浮動元件
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    setCropping(false); clearCrop(); closeAiCard();
+    setCropping(false); clearCrop(); closeAiCard(); setLibDrawer(false);
     selBar.hidden = true; $("#ctxMenu").hidden = true; $("#citeCard").hidden = true; hideFigure();
     return;
   }
@@ -759,7 +846,7 @@ function commentEditor(sel) {
                           comment: ta.value.trim() });
     closeAiCard();
     getSelection().removeAllRanges();
-    openPanel("comments");
+    openPanel("notes");
   };
 }
 
@@ -1061,7 +1148,10 @@ $("#trMode").addEventListener("click", (e) => {
 
 function setTrMode(mode) {
   S.trMode = mode;
-  $$("#trMode button").forEach((x) => x.classList.toggle("on", x.dataset.mode === mode));
+  $$("#trMode button").forEach((x) => {
+    x.classList.toggle("on", x.dataset.mode === mode);
+    x.setAttribute("aria-pressed", x.dataset.mode === mode);
+  });
   $("#pages").classList.toggle("tr-overlay", mode === "overlay");
   $("#pages").classList.toggle("tr-side", mode === "side");
   if (mode === "off") { S.trQueue = []; return; }
@@ -1188,13 +1278,16 @@ $("#btnHighlight").onclick = async () => {
     alert(`自動標註失敗：${e.message}`);
   }
   btn.disabled = false;
-  btn.lastChild.textContent = "自動標註";
+  btn.lastChild.textContent = "自動畫重點";
 };
 
 /* ---------------- 活動面板 ---------------- */
 function openPanel(name) {
   $("main").classList.remove("nopanel");
-  $$(".tabs button[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  $$(".tabs button[data-tab]").forEach((b) => {
+    b.classList.toggle("on", b.dataset.tab === name);
+    b.setAttribute("aria-selected", b.dataset.tab === name);
+  });
   $$(".tab").forEach((t) => t.classList.toggle("on", t.id === `tab-${name}`));
 }
 $$(".tabs button[data-tab]").forEach((b) => (b.onclick = () => openPanel(b.dataset.tab)));
@@ -1213,7 +1306,7 @@ function renderInfo() {
     ${p.abstract ? `<details open><summary class="small">摘要（原文）</summary><p class="small">${escapeHTML(p.abstract)}</p></details>` : ""}`;
 }
 
-function renderActivity() { renderNotes(); renderExplains(); renderComments(); }
+function renderActivity() { renderNotes(); renderExplains(); renderComments(); drawRail(); }
 
 // 標註分頁的篩選器
 $("#colorFilter").innerHTML = [...COLORS, "custom"].map((c) =>
@@ -1256,7 +1349,7 @@ function renderNotes() {
   const q = S.filter.q;
   const items = S.annotations.filter((a) => (a.kind === "user" || AUTO[a.kind]) && visibleOnPage(a)
     && (!q || `${a.text} ${a.comment}`.toLowerCase().includes(q)));
-  ul.innerHTML = items.length ? "" : '<li class="muted small empty">還沒有標註。選取文字按螢光筆（H），或按上方「自動標註」。</li>';
+  ul.innerHTML = items.length ? "" : '<li class="muted small empty">還沒有標註。選取文字按「畫重點」（H），或按頂列的「自動畫重點」。</li>';
   for (const a of items) {
     const tag = AUTO[a.kind] ? `<span class="mtag ${a.kind.slice(5)}">${AUTO[a.kind]}</span>` : "";
     const li = noteItem(a, `${tag}<div class="txt">${escapeHTML(a.text)}</div>
@@ -1272,7 +1365,7 @@ function renderNotes() {
 function renderExplains() {
   const ul = $("#explainList");
   const items = S.annotations.filter((a) => a.kind === "explain").sort((a, b) => b.created - a.created);
-  ul.innerHTML = items.length ? "" : '<li class="muted small empty">選字後按「解釋」（E）或在 Ask AI 提問，結果會記在這裡。</li>';
+  ul.innerHTML = items.length ? "" : '<li class="muted small empty">選字後按「解釋」（E）或「問 AI」，結果會記在這裡。</li>';
   for (const a of items) {
     const turns = ((a.comment || "").match(/\n---\n/g) || []).length + 1;
     const li = noteItem(a, `<blockquote>${escapeHTML(a.text.slice(0, 160))}</blockquote>
@@ -1291,7 +1384,7 @@ function renderExplains() {
 function renderComments() {
   const ul = $("#commentList");
   const items = S.annotations.filter((a) => a.kind === "comment").sort((a, b) => b.created - a.created);
-  ul.innerHTML = items.length ? "" : '<li class="muted small empty">選取文字後按右鍵 →「加註解」，或按工具列的註解圖示（C）。</li>';
+  ul.innerHTML = items.length ? "" : '<li class="muted small empty">選取文字後按「寫註解」（C），或按右鍵 →「寫註解」。</li>';
   for (const a of items) {
     const li = noteItem(a, `<blockquote>${escapeHTML(a.text.slice(0, 160))}</blockquote>
       <textarea rows="2">${escapeHTML(a.comment)}</textarea>`);
@@ -1329,16 +1422,22 @@ async function runSummary(refresh) {
 $("#btnSummary").onclick = () => runSummary(false);
 $("#btnSummaryRe").onclick = () => runSummary(true);
 
-/* 「在 Wiki 中」：哪些 workspace 的 Wiki 頁引用了這篇（沒有就整段不顯示） */
+/* Wiki 分頁：這篇的論文頁（slug = paper-<id>）置頂，其他提到這篇的頁面收成「還有 N 頁提到這篇」 */
 async function loadPaperWiki(pid) {
-  $("#paperWiki").hidden = true;
+  const box = $("#paperWiki");
+  box.innerHTML = '<p class="muted small">讀取中…</p>';
   const links = await api(`/api/papers/${pid}/wiki`).catch(() => []);
-  if (S.paper?.id !== pid || !links.length) return;
-  $("#paperWikiList").innerHTML = links.map((l) => `<li><button class="wbitem" data-ws="${escapeHTML(l.workspace_id)}" data-slug="${escapeHTML(l.slug)}">
-    ${escapeHTML(l.title)}<span class="small muted">${escapeHTML(l.workspace_name)}</span></button></li>`).join("");
-  $("#paperWiki").hidden = false;
+  if (S.paper?.id !== pid) return;
+  const item = (l) => `<li><button class="wbitem" data-ws="${escapeHTML(l.workspace_id)}" data-slug="${escapeHTML(l.slug)}">
+    ${escapeHTML(l.title)}<span class="small muted">${escapeHTML(l.workspace_name)}</span></button></li>`;
+  const own = links.filter((l) => l.slug === `paper-${pid}`), rest = links.filter((l) => l.slug !== `paper-${pid}`);
+  box.innerHTML = !links.length
+    ? '<p class="muted">這篇還沒整理進任何研究主題的 Wiki。到研究主題的 Wiki 分頁按「更新 Wiki」，它的論文頁就會出現在這裡。</p>'
+    : `${own.length ? `<section class="psec"><h3>這篇的論文頁</h3><ul class="wblist">${own.map(item).join("")}</ul></section>` : ""}
+      ${rest.length ? `<details class="psec wmore"${own.length ? "" : " open"}><summary>還有 ${rest.length} 頁提到這篇</summary>
+        <ul class="wblist">${rest.map(item).join("")}</ul></details>` : ""}`;
 }
-$("#paperWikiList").onclick = async (e) => {
+$("#paperWiki").onclick = async (e) => {
   const b = e.target.closest("button[data-ws]");
   if (!b) return;
   const ws = (await api("/api/workspaces")).find((w) => w.id === b.dataset.ws);
@@ -1374,23 +1473,14 @@ async function loadRelated(url) {
 $("#btnRelated").onclick = () => S.paper && loadRelated(`/api/papers/${S.paper.id}/related`);
 $("#btnRecLib").onclick = () => loadRelated("/api/recommendations");
 
-/* ---------------- 浮動聊天視窗 ---------------- */
-let chatLoaded = false;
-const chatWin = $("#chatWin");
-$("#fab").onclick = () => {
-  chatWin.hidden = !chatWin.hidden;
-  if (!chatWin.hidden) { if (!chatLoaded) loadChat(); $("#chatInput").focus(); }
-};
-$("#chatClose").onclick = () => { chatWin.hidden = true; };
-makeDraggable(chatWin, $(".chead", chatWin));
-
+/* ---------------- 問這篇論文（「讀懂」分頁底部的聊天） ---------------- */
 async function loadChat() {
   if (!S.paper) { $("#chatOut").innerHTML = '<p class="muted">先開啟一篇論文。</p>'; return; }
-  chatLoaded = true;
   const out = $("#chatOut"), pid = S.paper.id;
   out.innerHTML = "";
-  const msgs = await api(`/api/papers/${pid}/chat`);
-  for (const m of msgs) addMsg(m.role, m.content);
+  const msgs = await api(`/api/papers/${pid}/chat`).catch(() => []);
+  if (S.paper?.id !== pid) return;  // 等的時候換了論文
+  for (const m of msgs) addMsg(m.role, m.content, false);
   if (!msgs.length) {
     out.innerHTML = '<div class="suggest"><p class="muted small">可以這樣問：</p></div>';
     const qs = await api(`/api/papers/${pid}/suggestions`).catch(() => []);
@@ -1406,12 +1496,13 @@ async function loadChat() {
   }
 }
 
-function addMsg(role, text) {
+// scroll = false：開論文時載入舊對話，分頁要停在最上面的摘要，不要捲到底
+function addMsg(role, text, scroll = true) {
   const d = document.createElement("div");
   d.className = `msg ${role}`;
   if (role === "user") d.textContent = text; else { renderMD(d, text); addCopy(d, text); }
   $("#chatOut").appendChild(d);
-  d.scrollIntoView({ block: "end" });
+  if (scroll) d.scrollIntoView({ block: "end" });
   return d;
 }
 function addCopy(d, text) {
@@ -1443,9 +1534,18 @@ $("#chatForm").onsubmit = (e) => {
 $("#chatInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); }
 });
-$("#chatClear").onclick = async () => {
-  if (!S.paper || !confirm("清除這篇論文的對話紀錄？")) return;
+// 不用 confirm()：第一下只是「上膛」，三秒內再按一次才真的清除
+$("#chatClear").onclick = async (e) => {
+  const b = e.currentTarget;
+  if (!S.paper) return;
+  if (!b.dataset.armed) {
+    b.dataset.armed = "1";
+    b.textContent = "再按一次清除";
+    setTimeout(() => { delete b.dataset.armed; b.textContent = "清除對話"; }, 3000);
+    return;
+  }
   await api(`/api/papers/${S.paper.id}/chat`, { method: "DELETE" });
+  delete b.dataset.armed; b.textContent = "清除對話";
   loadChat();
 };
 
@@ -1963,15 +2063,19 @@ $("#wsDelete").onclick = async () => {
   showHome();
 };
 $("#wsBack").onclick = showHome;
-$("#btnHome").onclick = showHome;
+$("#btnHome").onclick = () => showWs(S.fromWs || null);
 const showSettings = (s) => { $("#setAutoTranslate").checked = s.auto_translate; $("#setAutoWiki").checked = !!s.auto_wiki; };
 // 主題：自動（跟系統）→ 淺色 → 深色；<head> 裡的小段程式在畫面出來前就套用
-const THEMES = { auto: "自動", light: "淺色", dark: "深色" };
+const THEMES = { auto: "自動（跟隨系統）", light: "淺色", dark: "深色" };
 function setTheme(t) {
   if (t === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
   store.set("lantern.theme", t);
-  $("#btnTheme").textContent = `主題：${THEMES[t]}`;
+  const keys = Object.keys(THEMES), next = keys[(keys.indexOf(t) + 1) % keys.length];
+  const b = $("#btnTheme"), label = `主題：${THEMES[t]}。按一下改成${THEMES[next]}`;
+  b.innerHTML = `<svg aria-hidden="true"><use href="#i-theme-${t}"/></svg>`;
+  b.setAttribute("aria-label", label);
+  b.title = label;
 }
 setTheme(store.get("lantern.theme", "auto") in THEMES ? store.get("lantern.theme", "auto") : "auto");
 $("#btnTheme").onclick = () => {

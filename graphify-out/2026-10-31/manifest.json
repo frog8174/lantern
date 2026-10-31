@@ -19,9 +19,9 @@
     "semantic_hash": ""
   },
   "backend/db.py": {
-    "mtime": 1793450108.0240104,
-    "seen": 1793454786.2064266,
-    "ast_hash": "69302f78853bca7d2c6d55f7500f1bad",
+    "mtime": 1793455235.2020946,
+    "seen": 1793455438.0012286,
+    "ast_hash": "b07636d986593d586c3de4ffc3e5d871",
     "semantic_hash": ""
   },
   "backend/features.py": {
@@ -37,9 +37,9 @@
     "semantic_hash": ""
   },
   "backend/main.py": {
-    "mtime": 1793450108.4076715,
-    "seen": 1793454786.2064266,
-    "ast_hash": "797e70dfb5745307f5d4e4d24010ef7c",
+    "mtime": 1793455250.2865639,
+    "seen": 1793455438.0012286,
+    "ast_hash": "89649bbc0b3ead6915bbeabba7fc03af",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793454747.6159453,
-    "seen": 1793454786.2064266,
-    "ast_hash": "bf809eeef631b993fd418f268b3eb727",
+    "mtime": 1793455322.1032677,
+    "seen": 1793455438.0012286,
+    "ast_hash": "e27c5c5fc00d83a8634117f21c06caca",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -121,9 +121,9 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793454697.6902804,
-    "seen": 1793454786.2064266,
-    "ast_hash": "8bb610e665be64efa8cad2f86027c25a",
+    "mtime": 1793455311.1922693,
+    "seen": 1793455438.0012286,
+    "ast_hash": "78b6bcf2527b0e820f4e7aa1f08dea16",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
@@ -163,9 +163,9 @@
     "semantic_hash": ""
   },
   "tests/test_paper_cards.py": {
-    "mtime": 1793448992.8216016,
-    "seen": 1793454786.2064266,
-    "ast_hash": "65dea6fcf768ca16d28d82601ac92264",
+    "mtime": 1793455251.039713,
+    "seen": 1793455438.0012286,
+    "ast_hash": "dac4d3189472225916ee52f4fe1b7aa8",
     "semantic_hash": ""
   },
   "docs/paper-cards.md": {

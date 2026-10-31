@@ -29,33 +29,33 @@
   <symbol id="i-crop" viewBox="0 0 24 24"><path d="M7 3v14h14M3 7h14v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-panel" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 5v14" stroke="currentColor" stroke-width="1.8"/></symbol>
   <symbol id="i-popout" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 4h9v9M20 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <!-- 主題鈕：自動＝半日半月、淺色＝日、深色＝月 -->
+  <symbol id="i-theme-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4.5a7.5 7.5 0 0 0 0 15z" fill="currentColor"/></symbol>
+  <symbol id="i-theme-light" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-theme-dark" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 
 <header class="top">
-  <button id="toggleLib" class="icon" title="論文庫 / 大綱">☰</button>
+  <!-- 窄螢幕（< 900px）左欄收成抽屜，這顆打開它 -->
+  <button id="toggleLib" class="tool" aria-expanded="false" aria-controls="lib">大綱</button>
   <div class="brand">Lantern</div>
-  <button id="btnHome" class="tool reader-only" title="回到首頁">← 回論文庫</button>
-  <div id="paperTitle" class="title"></div>
+  <!-- 回到這篇所在的研究主題；從「全部論文」開的就回全部論文 -->
+  <button id="btnHome" class="backlink reader-only"><svg aria-hidden="true"><use href="#i-back"/></svg><span id="backName">全部論文</span></button>
+  <h1 id="paperTitle" class="title"></h1>
   <div class="tools">
-    <div class="group">
-      <button id="btnZoomOut" class="icon" title="縮小">−</button>
-      <span id="zoomLabel">120%</span>
-      <button id="btnZoomIn" class="icon" title="放大">＋</button>
+    <div class="seg" id="trMode" role="group" aria-label="閱讀模式" title="保留版面翻譯">
+      <button data-mode="off" class="on" aria-pressed="true">原文</button>
+      <button data-mode="overlay" aria-pressed="false" title="譯文疊在原文位置，滑過看原文">譯文疊上</button>
+      <button data-mode="side" aria-pressed="false" title="原文頁和譯文頁左右並排，圖表保留">左右對照</button>
     </div>
-    <div class="group pagenav">
-      <input id="pageInput" inputmode="numeric" aria-label="目前頁碼" value="1"><span id="pageTotal">/ 0</span>
-    </div>
-    <button id="btnCrop" class="tool" title="框選圖表或公式請 AI 解釋（也可以按住 Ctrl / ⌘ 直接拖曳）"><svg><use href="#i-crop"/></svg>框選</button>
-    <button id="btnHighlight" class="tool" title="自動標註新穎性 / 方法 / 結果"><svg><use href="#i-spark"/></svg>自動標註</button>
-    <div class="seg" id="trMode" role="group" aria-label="翻譯模式" title="保留版面翻譯">
-      <button data-mode="off" class="on">原文</button>
-      <button data-mode="overlay" title="譯文疊在原文位置，滑過看原文">疊加</button>
-      <button data-mode="side" title="原文頁｜譯文頁 並排，圖表保留">並排</button>
-    </div>
-    <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
+    <button id="btnCrop" class="tool" title="框選圖表或公式請 AI 解釋（也可以按住 Ctrl / ⌘ 直接拖曳）"><svg aria-hidden="true"><use href="#i-crop"/></svg><span>框選問 AI</span></button>
+    <button id="btnHighlight" class="tool" title="自動標出新穎性、方法、結果"><svg aria-hidden="true"><use href="#i-spark"/></svg><span>自動畫重點</span></button>
+    <button id="togglePanel" class="icon" title="顯示／收起右側面板" aria-label="顯示／收起右側面板"><svg aria-hidden="true"><use href="#i-panel"/></svg></button>
   </div>
-  <div id="userBox" class="userbox"><span id="userName"></span><button id="btnTheme" class="link small" title="切換淺色／深色">主題：自動</button><button id="btnSettings" class="link small">設定</button><button id="btnLogout" class="link small">登出</button></div>
+  <div id="userBox" class="userbox"><span id="userName"></span><button id="btnSettings" class="link small">設定</button><button id="btnLogout" class="link small">登出</button></div>
+  <button id="btnTheme" class="icon themebtn" aria-label="主題：自動"><svg aria-hidden="true"><use href="#i-theme-auto"/></svg></button>
 </header>
 
 <!-- 登入頁：測試登入，選一個使用者 -->
@@ -143,68 +143,79 @@
 </dialog>
 
 <main>
-  <aside id="lib" class="lib">
+  <!-- 左欄只放「這篇」：大綱在上，下面是同研究主題的其他論文 -->
+  <aside id="lib" class="lib" tabindex="-1" aria-label="這篇論文">
     <section>
-      <h3>匯入論文</h3>
-      <label class="drop" id="drop">
-        <input type="file" id="file" accept="application/pdf" hidden>
-        拖曳 PDF 到這裡，或點擊選檔
-      </label>
-      <form id="arxivForm" class="arxiv">
-        <input id="arxivInput" placeholder="arXiv 編號或 PDF 網址" title="arXiv 編號 / 網址，或任何直接下載 PDF 的網址（學校網路下的期刊 PDF 也可以）">
-        <button>匯入</button>
-      </form>
-      <div id="ingestStatus" class="muted small"></div>
+      <h2 class="lhead">大綱 <button id="btnAiOutline" class="link small" title="PDF 沒有目錄時用 AI 生成">AI 生成</button></h2>
+      <ul id="outline" class="list outline"></ul>
     </section>
-    <section>
-      <h3>論文庫</h3>
-      <input id="libSearch" class="libsearch" placeholder="篩選標題、標籤；Enter = 全文搜尋">
+    <section class="lsib">
+      <h2 class="lhead" id="sideHead">同主題的論文</h2>
+      <input id="libSearch" class="libsearch" aria-label="篩選論文" placeholder="篩選標題、標籤；Enter 搜尋全文">
       <div id="tagBar" class="tagbar"></div>
-      <ul id="paperList" class="list"></ul>
+      <ul id="paperList" class="list sibs"></ul>
       <div id="searchOut" hidden>
-        <h3>全文搜尋結果 <button id="searchClose" class="link small">關閉</button></h3>
+        <h2 class="lhead">全文搜尋結果 <button id="searchClose" class="link small">關閉</button></h2>
         <ul id="searchList" class="list hits"></ul>
       </div>
     </section>
-    <section>
-      <h3>大綱 <button id="btnAiOutline" class="link small" title="PDF 沒有目錄時用 AI 生成">AI 生成</button></h3>
-      <ul id="outline" class="list outline"></ul>
-    </section>
   </aside>
 
-  <section id="viewer" class="viewer">
-    <div id="empty" class="empty">
-      <div class="moon"></div>
-      <p>從左邊匯入一篇論文開始閱讀。</p>
-      <p class="muted small">選取文字 → 解釋 / 螢光筆 / 翻譯 / 提問　　點 [12] 看引用　　Ctrl/⌘＋拖曳 框選圖表　　右鍵 加註解</p>
+  <div class="stage">
+    <section id="viewer" class="viewer">
+      <div id="empty" class="empty">
+        <div class="moon"></div>
+        <p>選一篇論文開始閱讀。</p>
+        <p class="muted small">選取文字 → 解釋 / 翻譯 / 畫重點 / 寫註解 / 問 AI　　點 [12] 看引用　　Ctrl/⌘＋拖曳 框選圖表　　右鍵 寫註解</p>
+      </div>
+      <div id="pages"></div>
+    </section>
+    <!-- 縮放與頁碼：PDF 區右下角的浮動小控制 -->
+    <div class="zoomctl" role="group" aria-label="縮放與頁碼">
+      <button id="btnZoomOut" class="icon" title="縮小" aria-label="縮小">−</button>
+      <span id="zoomLabel">120%</span>
+      <button id="btnZoomIn" class="icon" title="放大" aria-label="放大">＋</button>
+      <span class="zsep" aria-hidden="true"></span>
+      <input id="pageInput" inputmode="numeric" aria-label="跳到第幾頁（Enter）" value="1"><span id="pageTotal">/ 0</span>
     </div>
-    <div id="pages"></div>
-  </section>
+    <!-- 頁面導軌：取代閱讀區的捲軸。燈光段＝目前看得到的範圍，右側刻度＝有螢光筆或註解的頁 -->
+    <div id="rail" class="rail" role="slider" tabindex="0" aria-label="頁面導軌" aria-orientation="vertical"
+         aria-valuemin="1" aria-valuemax="1" aria-valuenow="1" title="點軌道跳到該處、拖燈光段捲動、點刻度跳到有標註的頁；上下鍵換頁">
+      <span class="rlamp"></span><span class="rlab rstart">1</span><span class="rlab rcur">1</span><span class="rlab rend"></span>
+      <span class="rticks"></span>
+    </div>
+  </div>
 
   <aside class="panel">
     <div class="pgrip" id="panelGrip" title="拖曳調整寬度" role="separator" aria-orientation="vertical"></div>
     <div class="phead"><b>活動面板</b>
       <button id="panelDock" class="link small" title="放回右側">停靠</button></div>
-    <nav class="tabs" role="tablist">
-      <button data-tab="home" class="on" title="總覽與摘要"><svg><use href="#i-home"/></svg><span>摘要</span></button>
-      <button data-tab="notes" title="螢光筆與自動標註"><svg><use href="#i-pen"/></svg><span>標註</span></button>
-      <button data-tab="explain" title="解釋紀錄"><svg><use href="#i-explain"/></svg><span>解釋</span></button>
-      <button data-tab="comments" title="註解"><svg><use href="#i-comment"/></svg><span>註解</span></button>
-      <button data-tab="refs" title="參考文獻"><svg><use href="#i-quote"/></svg><span>引用</span></button>
-      <button data-tab="related" title="相關論文"><svg><use href="#i-link"/></svg><span>相關</span></button>
-      <button id="panelFloat" class="pfloat" title="彈出成浮動視窗（可拖曳、可調整大小）"><svg><use href="#i-popout"/></svg><span>彈出</span></button>
+    <nav class="tabs" role="tablist" aria-label="面板分頁">
+      <button role="tab" data-tab="read" class="on" aria-selected="true" aria-controls="tab-read">讀懂</button>
+      <button role="tab" data-tab="notes" aria-selected="false" aria-controls="tab-notes">我的筆記</button>
+      <button role="tab" data-tab="refs" aria-selected="false" aria-controls="tab-refs">文獻</button>
+      <button role="tab" data-tab="wiki" aria-selected="false" aria-controls="tab-wiki">Wiki</button>
+      <button id="panelFloat" class="icon pfloat" title="彈出成浮動視窗（可拖曳、可調整大小）" aria-label="彈出成浮動視窗"><svg aria-hidden="true"><use href="#i-popout"/></svg></button>
     </nav>
 
-    <div class="tab on" id="tab-home">
+    <!-- 讀懂：摘要、解釋紀錄、問這篇的聊天（輸入框固定在分頁底部） -->
+    <div class="tab on" id="tab-read" role="tabpanel">
       <div class="feed">
         <div id="paperInfo" class="info"><p class="muted">開啟論文後，這裡會顯示論文資訊。</p></div>
-        <div class="row"><h4>AI 摘要</h4><div><button id="btnSummary" class="small">產生摘要</button><button id="btnSummaryRe" class="link small">重新產生</button></div></div>
-        <div id="summaryOut" class="md"></div>
-        <section id="paperWiki" class="pwiki" hidden><h4>在 Wiki 中</h4><ul id="paperWikiList" class="wblist"></ul></section>
+        <section class="psec"><div class="row"><h3>這篇在說什麼</h3><div><button id="btnSummary" class="small">產生摘要</button><button id="btnSummaryRe" class="link small">重新產生</button></div></div>
+          <div id="summaryOut" class="md"></div></section>
+        <section class="psec"><h3>解釋紀錄</h3><ul id="explainList" class="notes"></ul></section>
+        <section class="psec"><div class="row"><h3>問這篇論文</h3><button id="chatClear" class="link small">清除對話</button></div>
+          <div id="chatOut"></div></section>
       </div>
+      <form id="chatForm" class="chatbox">
+        <textarea id="chatInput" rows="2" aria-label="問這篇論文" placeholder="問這篇論文任何問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+        <button class="icon send" title="送出" aria-label="送出"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+      </form>
     </div>
 
-    <div class="tab" id="tab-notes">
+    <!-- 我的筆記：螢光筆、自動標註、註解 -->
+    <div class="tab" id="tab-notes" role="tabpanel">
       <div class="filters">
         <div class="frow"><span class="small muted">顏色</span><span id="colorFilter" class="swatches"></span></div>
         <div class="frow">
@@ -212,39 +223,48 @@
           <label><input type="checkbox" id="showLabels" checked> 顯示標籤</label>
         </div>
         <div class="frow" id="autoFilter"></div>
-        <input id="noteSearch" placeholder="搜尋標註…">
+        <input id="noteSearch" aria-label="搜尋螢光筆" placeholder="搜尋螢光筆與自動標註…">
       </div>
-      <ul id="notesList" class="notes"></ul>
+      <div class="feed">
+        <section class="psec"><h3>螢光筆與自動標註</h3><ul id="notesList" class="notes"></ul></section>
+        <section class="psec"><h3>註解</h3><ul id="commentList" class="notes"></ul></section>
+      </div>
     </div>
 
-    <div class="tab" id="tab-explain"><ul id="explainList" class="notes"></ul></div>
-    <div class="tab" id="tab-comments"><ul id="commentList" class="notes"></ul></div>
-
-    <div class="tab" id="tab-refs">
-      <div class="filters"><input id="refSearch" placeholder="搜尋參考文獻…"></div>
-      <ul id="refList" class="notes refs"></ul>
+    <!-- 文獻：參考文獻、相關論文 -->
+    <div class="tab" id="tab-refs" role="tabpanel">
+      <div class="feed">
+        <section class="psec"><h3>參考文獻</h3>
+          <input id="refSearch" class="fullw" aria-label="搜尋參考文獻" placeholder="搜尋參考文獻…">
+          <ul id="refList" class="notes refs"></ul></section>
+        <section class="psec"><h3>相關論文</h3>
+          <div class="rbtns">
+            <button id="btnRelated" title="Semantic Scholar 依這篇推薦">與本篇相關</button>
+            <button id="btnRecLib" title="以論文庫所有論文為依據推薦">依我的論文庫推薦</button>
+          </div>
+          <div id="ingestStatus" class="muted small" role="status"></div>
+          <ul id="relatedList" class="related"><li class="muted small">按上方按鈕取得推薦（資料來自 Semantic Scholar）。</li></ul></section>
+      </div>
     </div>
 
-    <div class="tab" id="tab-related">
-      <div class="row pad">
-        <button id="btnRelated" title="Semantic Scholar 依這篇推薦">與本篇相關</button>
-        <button id="btnRecLib" title="以論文庫所有論文為依據推薦">依我的論文庫推薦</button>
-      </div>
-      <ul id="relatedList" class="related"><li class="muted small">按上方按鈕取得推薦（資料來自 Semantic Scholar）。</li></ul>
+    <!-- Wiki：這篇的論文頁置頂，其他提到它的頁面收成一行 -->
+    <div class="tab" id="tab-wiki" role="tabpanel">
+      <div class="feed" id="paperWiki"></div>
     </div>
   </aside>
 </main>
 
 <!-- 選字後浮出的工具列 -->
-<div id="selBar" class="pill" hidden>
-  <button data-act="explain" title="解釋（E）"><svg><use href="#i-explain"/></svg></button>
+<div id="selBar" class="pill" role="toolbar" aria-label="選取文字的動作" hidden>
+  <button data-act="explain" title="解釋（E）">解釋</button>
+  <button data-act="translate" title="翻譯（T）">翻譯</button>
   <span class="hlwrap">
-    <button data-act="highlight" title="螢光筆（H）"><svg><use href="#i-pen"/></svg></button>
+    <button data-act="highlight" title="畫重點（H）；滑過選顏色">畫重點</button>
     <span class="palette" id="palette"></span>
   </span>
-  <button data-act="translate" title="翻譯（T）"><svg><use href="#i-globe"/></svg></button>
-  <button data-act="comment" title="加註解（C）"><svg><use href="#i-comment"/></svg></button>
-  <input id="askInput" placeholder="Ask AI …" aria-label="針對選取段落提問">
+  <button data-act="comment" title="寫註解（C）">寫註解</button>
+  <button data-act="ask" title="針對選取的段落提問">問 AI</button>
+  <input id="askInput" placeholder="想問什麼？Enter 送出" aria-label="針對選取段落提問" hidden>
 </div>
 
 <!-- 框選區域後浮出的工具列 -->
@@ -256,9 +276,9 @@
 
 <!-- 右鍵選單 -->
 <div id="ctxMenu" class="menu" hidden>
-  <button data-act="comment"><svg><use href="#i-comment"/></svg>加註解</button>
+  <button data-act="comment"><svg><use href="#i-comment"/></svg>寫註解</button>
   <button data-act="explain"><svg><use href="#i-explain"/></svg>解釋</button>
-  <button data-act="highlight"><svg><use href="#i-pen"/></svg>螢光筆</button>
+  <button data-act="highlight"><svg><use href="#i-pen"/></svg>畫重點</button>
   <button data-act="copy"><svg><use href="#i-copy"/></svg>複製</button>
 </div>
 
@@ -274,18 +294,6 @@
 <div id="citeCard" class="citecard" hidden></div>
 <div id="figCard" class="citecard figcard" hidden></div>
 
-<!-- 浮動聊天視窗 -->
-<button id="fab" class="fab" title="問 AI（聊天）"><svg><use href="#i-chat"/></svg></button>
-<div id="chatWin" class="chatwin" hidden>
-  <div class="chead"><b>和這篇論文聊聊</b>
-    <button id="chatClear" class="link small">清除對話</button>
-    <button id="chatClose" class="icon" title="關閉"><svg><use href="#i-close"/></svg></button></div>
-  <div id="chatOut" class="feed"></div>
-  <form id="chatForm" class="chatbox">
-    <textarea id="chatInput" rows="2" placeholder="問這篇論文任何問題…（Enter 送出，Shift+Enter 換行）"></textarea>
-    <button class="icon send" title="送出"><svg><use href="#i-send"/></svg></button>
-  </form>
-</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
