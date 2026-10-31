@@ -85,7 +85,7 @@ def test_workspace_crud(papers, client, bob):
     bob.delete(f"/api/workspaces/{mine['id']}")
 
 
-def test_upload_into_workspace(client, bob, pdfs):
+def test_upload_into_workspace(client, bob, pdfs, allow_duplicates):
     w = client.post("/api/workspaces", json={"name": "inbox"}).json()
     path = pdfs["numeric"]
     with open(path, "rb") as f:
@@ -100,7 +100,7 @@ def test_upload_into_workspace(client, bob, pdfs):
     client.delete(f"/api/workspaces/{w['id']}")
 
 
-def test_auto_translate_setting(client, pdfs):
+def test_auto_translate_setting(client, pdfs, allow_duplicates):
     import time
     from backend import db
     assert client.get("/api/me/settings").json() == {"auto_translate": False, "auto_wiki": False}

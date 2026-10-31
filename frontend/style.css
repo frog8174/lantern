@@ -537,6 +537,16 @@ body[data-view="login"] #userBox { display: none; }
 .card .cdel { position: absolute; top: 4px; right: 4px; z-index: 1; width: var(--tap); height: var(--tap); padding: 0; border: none;
   background: none; color: var(--ink-2); font-size: 18px; justify-content: center; display: inline-flex; align-items: center; }
 .card .cdel:hover { color: var(--seal); background: var(--leaf); }
+/* 處理階段：只在背景取書目／翻譯時出現，安靜的小字 + 燈光色（docs/ux-round1.md B2） */
+.cstage { color: var(--lamp); font-family: var(--font-tool); font-size: 14px; line-height: 1.5; }
+/* 兩下刪除：第一下上膛，按鈕變朱色並換成俚語（armDelete） */
+button[data-armed] { color: var(--seal); }
+.card .cdel[data-armed] { color: var(--seal); width: auto; padding: 0 12px; font-size: 14px; white-space: nowrap; background: var(--panel);
+  border: 1px solid var(--seal); border-radius: var(--radius-sm); }
+.card .cdel[data-armed]:hover { color: var(--seal); background: var(--panel); }
+/* 就地輸入框（取代 prompt()）：暫時站在按鈕的位置 */
+.inline-in { min-height: var(--tap); min-width: 0; width: 18em; max-width: 100%; font-family: var(--font-tool); font-size: 14px; }
+.tiles > .inline-in { align-self: center; width: 100%; }
 .dlg { border: 1px solid var(--rule-strong); border-radius: var(--radius-dlg); background: var(--panel);
   color: var(--ink); box-shadow: var(--shadow-float); width: min(520px, calc(100vw - 32px)); max-height: 70vh; padding: 12px 16px 16px; }
 .dlg::backdrop { background: var(--backdrop); }

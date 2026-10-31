@@ -1,7 +1,7 @@
 """FastAPI 入口。啟動：uv run uvicorn backend.main:app --reload --port 7800
 
 API 一覽（前端 app.js 會呼叫）：
-  POST   /api/papers                 上傳 PDF（multipart）
+  POST   /api/papers                 上傳 PDF（multipart）；已有同一篇就回傳既有那篇 + duplicate: true
   POST   /api/papers/arxiv           用 arXiv 網址或編號匯入
   GET    /api/papers                 論文列表
   GET    /api/papers/{id}            論文資訊（標題、大綱、摘要…）
@@ -28,7 +28,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
+import os
 import re
 from typing import Annotated, AsyncIterator, Callable, Literal
 
@@ -160,15 +162,39 @@ async def _ocr_pages(path: str, pages: list[int]) -> tuple[dict[int, str], str |
         return {}, f"{type(e).__name__}: {e}"
 
 
+_DOI_RE = re.compile(r"\b10\.\d{4,9}/[^\s\"<>]+")
+
+
+def _first_doi(parsed) -> str | None:
+    """第一頁上的 DOI（期刊論文通常印在頁首或頁尾）。"""
+    m = _DOI_RE.search(" ".join(b.text for b in parsed.blocks if b.page == 0))
+    return m.group(0).rstrip(".,;)]") if m else None
+
+
+def _duplicate(uid: str, pid: str, path: str, workspace: str | None) -> dict:
+    """已經有這篇：丟掉剛存的檔案，回傳既有那篇；在研究主題裡上傳就把它加進去。"""
+    os.remove(path)
+    if workspace:
+        db.add_to_workspace(workspace, pid)
+        _auto_wiki(uid, workspace)
+    return {"id": pid, "title": db.get_paper(pid)["title"], "duplicate": True}
+
+
 async def _ingest(uid: str, pid: str, filename: str, path: str, workspace: str | None) -> dict:
+    with open(path, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    if dup := db.find_duplicate(uid, sha256=sha):  # 同一個檔案：連解析都不用
+        return _duplicate(uid, dup, path, workspace)
     parsed = parse_pdf(path)
     ocr_error = None
     if parsed.scanned_pages and config.OCR_ENABLED:
         results, ocr_error = await _ocr_pages(path, parsed.scanned_pages)
         pdf_parse.apply_ocr(parsed, results)
+    if dup := db.find_duplicate(uid, doi=_first_doi(parsed), title=parsed.title):  # 在建索引（最花時間）之前
+        return _duplicate(uid, dup, path, workspace)
     n = await retrieval.build_index(pid, parsed.blocks)
     meta = parsed.to_dict()
-    db.add_paper(uid, pid, filename, parsed.title, meta)
+    db.add_paper(uid, pid, filename, parsed.title, meta, sha)
     if workspace:
         db.add_to_workspace(workspace, pid)
         _auto_wiki(uid, workspace)
@@ -254,7 +280,8 @@ async def import_url(body: ArxivIn, uid: Uid):
 def papers(uid: Uid, workspace: str | None = None):
     if workspace:
         _ws_or_404(workspace, uid)
-    return [{**p, "translating": p["id"] in _translating} for p in db.list_papers(uid, workspace)]
+    return [{**p, "translating": p["id"] in _translating, "fetching_bib": p["id"] in _fetching_bib}
+            for p in db.list_papers(uid, workspace)]
 
 
 @app.get("/api/papers/{pid}")
@@ -305,10 +332,16 @@ async def _ensure_bib(p: dict) -> dict:
 
 async def _prefetch_bib(pid: str) -> None:
     """匯入後在背景先取書目，卡片才一開始就有作者與出處；失敗就等使用者按「引用」再試。"""
+    _fetching_bib.add(pid)
     try:
         await _ensure_bib(db.get_paper(pid))
     except Exception as e:
         print(f"[bib] {pid}: {type(e).__name__}: {e}")
+    finally:
+        _fetching_bib.discard(pid)
+
+
+_fetching_bib: set[str] = set()  # 背景取書目中的論文 id（卡片上的「取得書目中」）
 
 
 THUMB_DIR = config.DATA_DIR / "thumbs"

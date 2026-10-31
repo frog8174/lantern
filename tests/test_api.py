@@ -194,7 +194,7 @@ def test_mock_mode(papers, client, monkeypatch):
     assert "MOCK" in text
 
 
-def test_delete_paper(client, pdfs):
+def test_delete_paper(client, pdfs, allow_duplicates):
     with open(pdfs["numeric"], "rb") as f:
         pid = client.post("/api/papers", files={"file": ("tmp.pdf", f, "application/pdf")}).json()["id"]
     assert client.delete(f"/api/papers/{pid}").json() == {"ok": True}
@@ -272,7 +272,7 @@ def test_region_png(papers, client):
     assert client.get(f"/api/papers/{pid}/region.png", params={"page": 99, "x0": 0, "y0": 0, "x1": 1, "y1": 1}).status_code == 400
 
 
-def test_import_from_pdf_url(client, pdfs):
+def test_import_from_pdf_url(client, pdfs, allow_duplicates):
     from tests.conftest import PORT
     fake_api.pdf_bytes = pdfs["numeric"].read_bytes()
     r = client.post("/api/papers/arxiv", json={"url": f"http://127.0.0.1:{PORT}/files/journal-article.pdf?token=1"})
