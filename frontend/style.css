@@ -735,3 +735,29 @@ a.wref:hover { text-decoration-style: solid; }
   cursor: pointer; color: var(--ink); border-left: 2px solid transparent; line-height: 1.45; overflow-wrap: anywhere; }
 .wbitem:hover { background: var(--leaf); border-left-color: var(--rule-strong); }
 .wbitem:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
+
+/* ---- 薛西弗斯（docs/design.md）：三層遮罩各自上色——主角 --ink、石頭 --lamp、山坡 --ink-3，深淺主題自動換色 ---- */
+.sis { position: relative; display: inline-block; flex: none; width: var(--sz, 48px); aspect-ratio: 1; vertical-align: middle; pointer-events: none; }
+.sis i { position: absolute; inset: 0; -webkit-mask: var(--m) 0 0 / 100% 100% no-repeat; mask: var(--m) 0 0 / 100% 100% no-repeat; }
+.sis .r { background: var(--ink-3); } .sis .f { background: var(--ink); } .sis .s { background: var(--lamp); }
+/* 推石：8 格逐格（三條精靈圖同步 steps(8)），石頭另外繞自己的中心順時針滾 */
+.sis-push .r { --m: url(img/sisyphus/slope_strip.png); }
+.sis-push .f { --m: url(img/sisyphus/fig_strip.png); }
+.sis-push .s { --m: url(img/sisyphus/stone_strip.png); transform-origin: 71.8% 27.5%; }
+.sis-push i { -webkit-mask-size: 800% 100%; mask-size: 800% 100%; animation: sis-walk 1.1s steps(8) infinite; }
+.sis-push .s { animation: sis-walk 1.1s steps(8) infinite, sis-roll 5s linear infinite; }
+@keyframes sis-walk { to { -webkit-mask-position: 114.2857% 0; mask-position: 114.2857% 0; } }
+@keyframes sis-roll { to { transform: rotate(360deg); } }
+/* 完成：石頭停在坡頂，燈亮一下再收成微光（只播一次） */
+.sis-summit .r { --m: url(img/sisyphus/summit_slope.png); }
+.sis-summit .f { --m: url(img/sisyphus/summit_fig.png); }
+.sis-summit .s { --m: url(img/sisyphus/summit_stone.png); animation: sis-lit 1.8s ease-out 1 both; }
+@keyframes sis-lit { 30% { filter: drop-shadow(0 0 10px var(--lamp)) brightness(1.2); } 100% { filter: drop-shadow(0 0 3px var(--lamp-fill)); } }
+/* 浮水印：靠著石頭休息，靜態、單色、極淡；放在空狀態右下角，文字疊在上面 */
+.sis-rest .f { --m: url(img/sisyphus/rest.png); background: var(--rule-strong); }
+.sis-line { display: inline-flex; align-items: center; gap: 10px; }
+.cards-empty:has(.sis-rest), .wempty:has(.sis-rest) { position: relative; overflow: hidden; min-height: 200px; }
+.cards-empty:has(.sis-rest) { display: flex; align-items: center; padding-right: 220px; }
+.sis.wm { position: absolute; right: -10px; bottom: -36px; }
+.cards-empty > :not(.sis), .wempty > :not(.sis) { position: relative; }
+@media (prefers-reduced-motion: reduce) { .sis i { animation: none !important; } }

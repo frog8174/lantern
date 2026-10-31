@@ -196,9 +196,15 @@ $("#libSearch").addEventListener("keydown", async (e) => {
 });
 $("#searchClose").onclick = () => { $("#searchOut").hidden = true; };
 
+/** 薛西弗斯圖示（docs/design.md）：push＝推石（等待中）、summit＝石頭到頂（完成）、rest＝休息（空狀態浮水印）。純裝飾，文字另外寫。 */
+function sisyphus(kind, size = 48, cls = "") {
+  const layers = kind === "rest" ? '<i class="f"></i>' : '<i class="r"></i><i class="f"></i><i class="s"></i>';
+  return `<span class="sis sis-${kind} ${cls}" style="--sz:${size}px" aria-hidden="true">${layers}</span>`;
+}
+
 async function ingest(promise, st = $("#ingestStatus")) {
   const stay = document.body.dataset.view === "ws";  // 研究主題頁上傳：留在原頁，新卡片排最前面
-  st.textContent = "解析中…（擷取文字、建立索引）";
+  st.innerHTML = `<span class="sis-line">${sisyphus("push", 32)}解析中…（擷取文字、建立索引）</span>`;
   try {
     const res = await promise;
     st.textContent = res.duplicate ? `這篇已經在論文庫裡${stay && curWs ? "，已加入這個研究主題" : ""}`
@@ -1589,7 +1595,7 @@ async function showHome() {
   $("#wsGrid").innerHTML = tile("", "全部論文", library.length, "all")
     + workspaces.map((w) => tile(w.id, w.name, w.count)).join("")
     + '<button class="card new" data-new="1"><span class="plus">＋</span>新增研究主題</button>'
-    + (workspaces.length ? "" : '<p class="cards-empty">還沒有研究主題。按「＋ 新增研究主題」把論文依主題分類；論文本身都會留在「全部論文」。</p>');
+    + (workspaces.length ? "" : `<p class="cards-empty">${sisyphus("rest", 240, "wm")}<span>還沒有研究主題。按「＋ 新增研究主題」把論文依主題分類；論文本身都會留在「全部論文」。</span></p>`);
 }
 $("#wsGrid").onclick = async (e) => {
   const b = e.target.closest("button.card");
@@ -1654,7 +1660,7 @@ function paintWsCards(focusId, sel) {
         <button class="cact ccite" aria-haspopup="dialog" title="複製引用格式"><svg aria-hidden="true"><use href="#i-quote"/></svg>引用</button>
       </span></div></div>${trRing(p)}
       <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
-    || `<p class="cards-empty">${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+    || `<p class="cards-empty">${sisyphus("rest", 240, "wm")}<span>${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</span></p>`;
   if (focusId) $(`#wsPapers .card[data-id="${CSS.escape(focusId)}"] ${sel}`)?.focus();
 }
 const cardPaper = (id) => wsPaperList.find((x) => x.id === id);
@@ -1803,7 +1809,7 @@ async function loadWiki() {
   if (w.running && !wikiBusy) $("#wikiUpdate").onclick();  // 重新整理前已在跑：接回進度
   $("#wikiList").innerHTML = w.pages.map((p) => `<li><button class="witem${p.slug === "index" ? " home" : ""}" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</button></li>`).join("");
   if (!w.pages.length) {
-    page.innerHTML = `<div class="wempty"><h3>這個研究主題還沒有 Wiki</h3>
+    page.innerHTML = `<div class="wempty">${sisyphus("rest", 240, "wm")}<h3>這個研究主題還沒有 Wiki</h3>
       <p>按「更新 Wiki」，Lantern 會逐篇讀過這裡的論文，為每篇寫一頁重點，把反覆出現的方法、概念與資料集整理成跨論文的條目，最後寫一頁總覽串起全部。</p>
       <p>每個說法都標著出處，點一下就回到論文的那一頁。之後加入新論文再按一次，只會整理新的那幾篇。</p>
       ${w.pending ? "" : "<p>先到「論文」分頁加入論文，才有東西可以整理。</p>"}</div>`;
@@ -1999,18 +2005,20 @@ $("#wikiUpdate").onclick = async () => {
   const here = () => curWs?.id === ws.id;
   wikiBusy = true;
   $("#wikiUpdate").disabled = true;
-  prog.textContent = "開始整理…";
+  // 推石動畫只建一次，之後只換文字（重建會讓動畫跳回第一格）
+  prog.innerHTML = `<span class="sis-line">${sisyphus("push", 48)}<span class="wmsg">開始整理…</span></span>`;
   bar.removeAttribute("value"); bar.hidden = false;
   try {
     await stream(`/api/workspaces/${ws.id}/wiki/update`, {}, (_, t) => {
       let m;
       try { m = JSON.parse(t); } catch { m = { msg: t }; }
       if (!here()) return;
-      prog.textContent = m.msg || "";
+      const msg = $(".wmsg", prog);
+      if (msg) msg.textContent = m.msg || ""; else prog.textContent = m.msg || "";
       bar.hidden = false;
       if (m.total) { bar.max = m.total; bar.value = m.done || 0; }
     });
-    if (here()) prog.textContent = "Wiki 已更新。";
+    if (here()) prog.innerHTML = `<span class="sis-line">${sisyphus("summit", 48)}Wiki 已更新。</span>`;
   } catch (e) {
     if (here()) prog.innerHTML = `<span class="err">更新沒有完成：${escapeHTML(e.message)}。已整理好的論文會保留，再按一次「更新 Wiki」只做剩下的。</span>`;
   }

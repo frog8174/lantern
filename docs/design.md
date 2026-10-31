@@ -43,3 +43,11 @@
 
 ## 用語
 - 「workspace」一律改稱「**研究主題**」（介面文字；程式與 API 名稱不動）。
+
+## 薛西弗斯（等待、完成、空狀態）
+原創黑繪陶風格（GPT Image 2 以文字生成，未使用第三方圖片作參考），素材在 `frontend/img/sisyphus/`，元件是 `app.js` 的 `sisyphus(kind, size)`。
+- 三層遮罩各自上色、深淺主題自動換色，**沒有底板**：主角 `--ink`、石頭 `--lamp`、山坡 `--ink-3`。
+- `push`：等待中（解析 PDF、Wiki 更新）。8 格逐格步伐（steps(8)，1.1s）＋石頭繞中心順時針滾（5s 一圈）。
+- `summit`：長工作完成（目前只用在 Wiki 更新完成）。石頭在坡頂，燈亮一下收成微光，只播一次。
+- `rest`：空狀態浮水印，靜態、單色 `--rule-strong`，放右下角，文字疊在上面。
+- 一律 `aria-hidden`，意思由旁邊的文字表達；`prefers-reduced-motion` 時全部靜止在第一格。

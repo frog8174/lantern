@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793457642.4355054,
-    "seen": 1793457667.7551777,
-    "ast_hash": "9bafd548403fbebd2bc3b0d8ad3cc77d",
+    "mtime": 1793462470.1743991,
+    "seen": 1793462528.5772603,
+    "ast_hash": "bd3cfba747a819bf5d80ff165ab4e817",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -175,9 +175,9 @@
     "semantic_hash": ""
   },
   "docs/design.md": {
-    "mtime": 1793454198.8184824,
-    "seen": 1793457667.7551777,
-    "ast_hash": "efa25e7e05e6785b705fffcf16469205",
+    "mtime": 1793462515.3547797,
+    "seen": 1793462528.5772603,
+    "ast_hash": "bcb895389ba734b97eaa7b8e053eccfb",
     "semantic_hash": ""
   },
   "docs/ux-round1.md": {
@@ -190,6 +190,48 @@
     "mtime": 1793457626.7013955,
     "seen": 1793457667.7551777,
     "ast_hash": "0d597b961bfae9d1925e979cb1411303",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/fig_strip.png": {
+    "mtime": 1793462433.5646384,
+    "seen": 1793462528.5772603,
+    "ast_hash": "d715b768015bedddd69fee2e8651f601",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/rest.png": {
+    "mtime": 1793462435.0245929,
+    "seen": 1793462528.5772603,
+    "ast_hash": "acbe25cf920821134d973e277fac4718",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/slope_strip.png": {
+    "mtime": 1793462433.5707295,
+    "seen": 1793462528.5772603,
+    "ast_hash": "1aea25225faf8810e3260ac3aa3ab879",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/stone_strip.png": {
+    "mtime": 1793462433.5759945,
+    "seen": 1793462528.5772603,
+    "ast_hash": "27a296f7e57ff7330e30a777c0b3562c",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/summit_fig.png": {
+    "mtime": 1793462433.581996,
+    "seen": 1793462528.5772603,
+    "ast_hash": "fd4aded43a6e52e001ca41429dae688a",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/summit_slope.png": {
+    "mtime": 1793462433.5857043,
+    "seen": 1793462528.5772603,
+    "ast_hash": "9c7e1ed791b0a86f169109539219f676",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/summit_stone.png": {
+    "mtime": 1793462433.5907152,
+    "seen": 1793462528.5772603,
+    "ast_hash": "a69b20dc4fdadf67b8c395d0dbcdc528",
     "semantic_hash": ""
   }
 }
