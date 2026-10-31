@@ -60,7 +60,7 @@
 
 <!-- 登入頁：測試登入，選一個使用者 -->
 <section id="loginView" class="view"><div class="vinner">
-  <div class="moon"></div>
+  <div id="loginSis" class="login-sis"></div>
   <h2 class="vtitle">請問是哪一位讀者？</h2>
   <p class="vlede">測試登入：免密碼，點一下名片就進入自己的論文庫。</p>
   <div id="userGrid" class="cards users"></div>
@@ -300,6 +300,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<!-- 背景工作完成的小提示（toast()）；連不上伺服器的常駐提示（reach()） -->
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="offline" class="toast offline" role="alert" hidden><span class="sis sis-rest" style="--sz:64px" aria-hidden="true"><i class="f"></i></span><span>連不上伺服器。檢查伺服器是否還在跑，然後重新整理。</span></div>
 <script src="app.js"></script>
 </body>
 </html>

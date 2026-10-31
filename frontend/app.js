@@ -37,19 +37,32 @@ const S = {
 
 /* ---------------- API 與串流 ---------------- */
 async function api(path, opts = {}) {
-  const r = await fetch(path, {
+  const r = await reach(path, {
     headers: opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : {},
     ...opts,
     body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body,
   });
-  if (r.status === 401 && document.body.dataset.view !== "login") showLogin();  // 沒登入或登入失效
+  // 沒登入或登入失效；已經在用（有 view）才算中途失效，登入頁改顯示休息的薛西弗斯
+  if (r.status === 401 && document.body.dataset.view !== "login") showLogin(!!document.body.dataset.view);
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
   return r.json();
 }
 
+/** fetch 本身失敗（不是 HTTP 錯誤）＝連不上伺服器：亮起 #offline；之後有回應就收起來。 */
+async function reach(path, opts) {
+  try {
+    const r = await fetch(path, opts);
+    $("#offline").hidden = true;
+    return r;
+  } catch (e) {
+    $("#offline").hidden = false;
+    throw e;
+  }
+}
+
 /** 讀 SSE：伺服器每推一段 data: {"t": "..."}，就呼叫 onText 一次。 */
 async function stream(path, { body, method = "POST" } = {}, onText) {
-  const r = await fetch(path, {
+  const r = await reach(path, {
     method, headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -196,10 +209,28 @@ $("#libSearch").addEventListener("keydown", async (e) => {
 });
 $("#searchClose").onclick = () => { $("#searchOut").hidden = true; };
 
-/** 薛西弗斯圖示（docs/design.md）：push＝推石（等待中）、summit＝石頭到頂（完成）、rest＝休息（空狀態浮水印）。純裝飾，文字另外寫。 */
+/** 薛西弗斯圖示（docs/design.md）：push＝推石（等待中）、summit＝石頭到頂（完成）、rest＝休息（空狀態浮水印）、fall＝石頭滾回（失敗，做好的保留）。純裝飾，文字另外寫。 */
 function sisyphus(kind, size = 48, cls = "") {
   const layers = kind === "rest" ? '<i class="f"></i>' : '<i class="r"></i><i class="f"></i><i class="s"></i>';
   return `<span class="sis sis-${kind} ${cls}" style="--sz:${size}px" aria-hidden="true">${layers}</span>`;
+}
+
+/** 等超過 400ms 才用 place(el) 放上推石（短等待不閃一下）；回傳的函式取消或收掉它，可重複呼叫。 */
+function pushLater(place, size = 32, text = "", cls = "sis-line") {
+  const w = document.createElement("span");
+  w.className = cls;
+  w.innerHTML = sisyphus("push", size) + (text && `<span class="muted small">${escapeHTML(text)}</span>`);
+  const t = setTimeout(() => place(w), 400);
+  return () => { clearTimeout(t); w.remove(); };
+}
+
+/** 右下角的小提示，5 秒後自己收掉（不擋操作）。 */
+function toast(html) {
+  const t = $("#toast");
+  t.innerHTML = html;
+  t.hidden = false;
+  clearTimeout(t.timer);
+  t.timer = setTimeout(() => { t.hidden = true; }, 5000);
 }
 
 async function ingest(promise, st = $("#ingestStatus")) {
@@ -221,7 +252,7 @@ async function ingest(promise, st = $("#ingestStatus")) {
     await loadLibrary();
     if (stay) renderWsCards(curWs); else openPaper(res.id);
   } catch (e) {
-    st.innerHTML = `<span class="err">失敗：${escapeHTML(e.message)}</span>`;
+    st.innerHTML = `<span class="sis-line">${sisyphus("fall", 48)}<span class="err">沒有匯入：${escapeHTML(e.message)}。論文庫沒有變動；確認檔案是 PDF（或 arXiv 編號、網址正確）後再試一次。</span></span>`;
   }
 }
 
@@ -252,8 +283,17 @@ async function openPaper(id) {
   $("#empty").hidden = true;
   $("#pageTotal").textContent = `/ ${S.paper.num_pages}`;
   renderOutline(S.paper.outline);
-  S.pdf = await pdfjsLib.getDocument(`/api/papers/${id}/pdf`).promise;
+  S.firstPage?.();
+  S.firstPage = pushLater((w) => $(".stage").append(w), 64, "打開論文中…", "vwait");  // renderPage 畫好第一頁就收
+  try {
+    S.pdf = await pdfjsLib.getDocument(`/api/papers/${id}/pdf`).promise;
+  } catch (e) {
+    S.firstPage();
+    throw e;
+  }
   buildPages();
+  clearTimeout(trPoll);
+  watchTranslation(id);
   renderInfo();
   renderActivity();
   $("#summaryOut").innerHTML = "";
@@ -262,6 +302,16 @@ async function openPaper(id) {
   closeAiCard();
   loadChat();
   history.replaceState(null, "", `#${id}`);
+}
+
+/* 背景整篇翻譯：開著的這篇還在翻就每 5 秒看一次，翻完跳提示；換篇或離開閱讀頁就停 */
+let trPoll = 0;
+async function watchTranslation(id, seen = false) {
+  if (S.paper?.id !== id || document.body.dataset.view !== "reader") return;
+  const p = (await api("/api/papers").catch(() => [])).find((x) => x.id === id);
+  if (S.paper?.id !== id) return;
+  if (p?.translating) trPoll = setTimeout(() => watchTranslation(id, true), 5000);
+  else if (seen && p) toast(`${sisyphus("summit", 48)}<span>整篇翻譯完成</span>`);
 }
 
 function buildPages() {
@@ -331,6 +381,7 @@ async function renderPage(i) {
   pg.canvas = canvas;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport,
                       transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+  S.firstPage?.();
 
   const tl = document.createElement("div");
   tl.className = "textLayer";
@@ -723,16 +774,19 @@ function placeFloating(el, anchor, width) {
 function closeAiCard() { card.hidden = true; cardJob++; }
 
 /** 串流一段回答到 target，回傳完整文字；失敗就在 target 顯示錯誤並回傳 null。 */
-async function streamInto(target, url, body, method = "POST") {
+// wait：第一段文字出來前，在 target 裡放多大的推石（0 = 不放）
+async function streamInto(target, url, body, method = "POST", wait = 0) {
   target.classList.add("cursor");
+  const stop = wait ? pushLater((w) => target.append(w), wait, "回答中…") : () => {};
   try {
-    const full = await stream(url, { body, method }, (t) => renderMD(target, t));
+    const full = await stream(url, { body, method }, (t) => { stop(); renderMD(target, t); });
     renderMD(target, full);
     return full;
   } catch (e) {
     target.innerHTML = `<span class="err">${escapeHTML(e.message)}</span>`;
     return null;
   } finally {
+    stop();
     target.classList.remove("cursor");
   }
 }
@@ -1274,6 +1328,7 @@ $("#btnHighlight").onclick = async () => {
     && confirm("已經有自動標註了，要重新產生嗎？（取消 = 只顯示現有的）");
   btn.disabled = true;
   btn.lastChild.textContent = "標註中…";
+  const stop = pushLater((w) => btn.after(w));
   try {
     const auto = await api(`/api/papers/${S.paper.id}/auto-highlight${refresh ? "?refresh=true" : ""}`, { method: "POST" });
     S.annotations = S.annotations.filter((a) => !a.kind.startsWith("auto:")).concat(auto);
@@ -1285,6 +1340,7 @@ $("#btnHighlight").onclick = async () => {
   } catch (e) {
     alert(`自動標註失敗：${e.message}`);
   }
+  stop();
   btn.disabled = false;
   btn.lastChild.textContent = "自動畫重點";
 };
@@ -1424,8 +1480,15 @@ $("#refSearch").oninput = renderRefs;
 
 /* ---------------- 摘要 ---------------- */
 async function runSummary(refresh) {
-  if (!S.paper) return;
+  const btn = $("#btnSummary");
+  if (!S.paper || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = "產生中…";
+  const stop = pushLater((w) => btn.parentElement.prepend(w));
   await streamInto($("#summaryOut"), `/api/papers/${S.paper.id}/summary${refresh ? "?refresh=true" : ""}`, null, "GET");
+  stop();
+  btn.disabled = false;
+  btn.textContent = "產生摘要";
 }
 $("#btnSummary").onclick = () => runSummary(false);
 $("#btnSummaryRe").onclick = () => runSummary(true);
@@ -1528,7 +1591,7 @@ async function sendChat(q) {
   $(".suggest", $("#chatOut"))?.remove();
   addMsg("user", q);
   const d = addMsg("assistant", "");
-  const full = await streamInto(d, `/api/papers/${S.paper.id}/chat`, { question: q, page: S.current });
+  const full = await streamInto(d, `/api/papers/${S.paper.id}/chat`, { question: q, page: S.current }, "POST", 32);
   if (full) addCopy(d, full);
   d.scrollIntoView({ block: "end" });
   S.chatBusy = false;
@@ -1562,8 +1625,12 @@ $("#chatClear").onclick = async (e) => {
 const setView = (v) => { document.body.dataset.view = v; };
 let workspaces = [], curWs = null;  // curWs = 目前的 workspace；null = 全部論文
 
-async function showLogin() {
+// expired：用到一半登入失效（401）→ 休息的薛西弗斯；平常 → 慢慢推石
+async function showLogin(expired = false) {
   setView("login");
+  $("#loginSis").innerHTML = sisyphus(expired ? "rest" : "push", 160, "slow");
+  $("#loginView .vlede").textContent = expired ? "登入已失效，點一下自己的名片重新進入。"
+    : "測試登入：免密碼，點一下名片就進入自己的論文庫。";
   const g = $("#userGrid");
   g.innerHTML = "";
   try {
@@ -1948,8 +2015,9 @@ async function sendAsk(q) {
   const d = addAsk("assistant", ""), body = d.firstChild;
   body.classList.add("cursor");
   body.setAttribute("aria-busy", "true");  // 串完才念出整段，不要一個字一個字報
+  const stop = pushLater((w) => body.append(w), 32, "回答中…");
   try {
-    const full = await stream(`/api/workspaces/${ws.id}/ask`, { body: { question: q } }, (t) => renderWiki(body, t));
+    const full = await stream(`/api/workspaces/${ws.id}/ask`, { body: { question: q } }, (t) => { stop(); renderWiki(body, t); });
     renderWiki(body, full);
     addSave(d, q, full);
     // 串流不回編號：串完再查一次，拿最新那則問題的 id，這題才能單獨刪
@@ -1958,6 +2026,7 @@ async function sendAsk(q) {
   } catch (e) {
     body.innerHTML = `<span class="err">${escapeHTML(e.message)}</span>`;
   } finally {
+    stop();
     body.classList.remove("cursor");
     body.removeAttribute("aria-busy");
     askBusy = false;
@@ -2020,7 +2089,7 @@ $("#wikiUpdate").onclick = async () => {
     });
     if (here()) prog.innerHTML = `<span class="sis-line">${sisyphus("summit", 48)}Wiki 已更新。</span>`;
   } catch (e) {
-    if (here()) prog.innerHTML = `<span class="err">更新沒有完成：${escapeHTML(e.message)}。已整理好的論文會保留，再按一次「更新 Wiki」只做剩下的。</span>`;
+    if (here()) prog.innerHTML = `<span class="sis-line">${sisyphus("fall", 48)}<span class="err">更新沒有完成：${escapeHTML(e.message)}。已整理好的論文會保留，再按一次「更新 Wiki」只做剩下的。</span></span>`;
   }
   wikiBusy = false;
   bar.hidden = true;
