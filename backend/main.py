@@ -172,8 +172,9 @@ async def _ingest(uid: str, pid: str, filename: str, path: str, workspace: str |
     if workspace:
         db.add_to_workspace(workspace, pid)
         _auto_wiki(uid, workspace)
-    if db.get_settings(uid).get("auto_translate"):
-        task = asyncio.create_task(_pretranslate(pid))
+    jobs = [_prefetch_bib(pid)] + ([_pretranslate(pid)] if db.get_settings(uid).get("auto_translate") else [])
+    for job in jobs:
+        task = asyncio.create_task(job)
         _bg_tasks.add(task)  # 留住參考，不然 task 可能被回收
         task.add_done_callback(_bg_tasks.discard)
     return {"id": pid, "title": parsed.title, "num_pages": parsed.num_pages, "chunks": n,
@@ -287,14 +288,41 @@ def edit_paper(pid: str, uid: Uid, body: TagsIn):
 async def cite_paper(pid: str, uid: Uid):
     """書目資料 + APA / IEEE / MLA / BibTeX。第一次才取書目並快取（docs/paper-cards.md）。"""
     p = _paper_or_404(pid, uid)
-    bib = db.cache_get(pid, "bib")
-    if bib is None:
-        try:
-            bib = await features.fetch_bib(p)
-        except Exception as e:  # LLM 也失敗：回原因給前端，不寫快取
-            raise HTTPException(502, f"取得書目資料失敗：{e}")
-        db.cache_set(pid, "bib", bib)
+    try:
+        bib = await _ensure_bib(p)
+    except Exception as e:  # LLM 也失敗：回原因給前端，不寫快取
+        raise HTTPException(502, f"取得書目資料失敗：{e}")
     return {"bib": bib, "styles": cite.styles(bib)}
+
+
+async def _ensure_bib(p: dict) -> dict:
+    bib = db.cache_get(p["id"], "bib")
+    if bib is None:
+        bib = await features.fetch_bib(p)
+        db.cache_set(p["id"], "bib", bib)
+    return bib
+
+
+async def _prefetch_bib(pid: str) -> None:
+    """匯入後在背景先取書目，卡片才一開始就有作者與出處；失敗就等使用者按「引用」再試。"""
+    try:
+        await _ensure_bib(db.get_paper(pid))
+    except Exception as e:
+        print(f"[bib] {pid}: {type(e).__name__}: {e}")
+
+
+THUMB_DIR = config.DATA_DIR / "thumbs"
+
+
+@app.get("/api/papers/{pid}/thumb.png")
+def paper_thumb(pid: str, uid: Uid):
+    """第一頁縮圖（論文卡、書架用）。畫一次就存檔。"""
+    _paper_or_404(pid, uid)
+    f = THUMB_DIR / f"{pid}.png"
+    if not f.exists():
+        THUMB_DIR.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(pdf_parse.render_page_png(_pdf_path(pid), 0, dpi=36))
+    return FileResponse(f, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.get("/api/search")
@@ -316,10 +344,8 @@ def search(q: str, uid: Uid):
 def delete(pid: str, uid: Uid):
     _paper_or_404(pid, uid)
     db.delete_paper(pid)
-    try:
-        (PDF_DIR / f"{pid}.pdf").unlink()
-    except FileNotFoundError:
-        pass
+    for f in (PDF_DIR / f"{pid}.pdf", THUMB_DIR / f"{pid}.png"):
+        f.unlink(missing_ok=True)
     return {"ok": True}
 
 

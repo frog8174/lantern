@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lantern 論文閱讀器</title>
+<script>/* 畫面出來前就套用手動選的主題，避免先閃一下深色 */try { const t = localStorage.getItem("lantern.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- 標題 Source Serif 4 + Noto Serif TC、內文 LXGW WenKai TC、工具 Noto Sans TC（docs/design.md） -->
@@ -54,7 +55,7 @@
     </div>
     <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
   </div>
-  <div id="userBox" class="userbox"><span id="userName"></span><button id="btnSettings" class="link small">設定</button><button id="btnLogout" class="link small">登出</button></div>
+  <div id="userBox" class="userbox"><span id="userName"></span><button id="btnTheme" class="link small" title="切換淺色／深色">主題：自動</button><button id="btnSettings" class="link small">設定</button><button id="btnLogout" class="link small">登出</button></div>
 </header>
 
 <!-- 登入頁：測試登入，選一個使用者 -->

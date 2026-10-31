@@ -46,9 +46,13 @@
   --card-radius: var(--radius); --card-pad: 18px; --card-gap: 18px;
   --backdrop: rgba(35, 33, 30, .35);
 }
+/* 主題：預設跟隨系統；右上角按鈕可手動指定 <html data-theme="light|dark">（存在瀏覽器） */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 @media (prefers-color-scheme: dark) {
-  /* 深色書桌（主場）。PDF 頁面與紙面維持亮紙 */
-  :root {
+  /* 深色書桌（主場）。PDF 頁面與紙面維持亮紙。這組值和下面 [data-theme="dark"] 那組相同，改的時候兩邊一起改 */
+  :root:not([data-theme="light"]) {
     --desk: #1C1B19; --panel: #24221F; --leaf: #2E2B27; --sheet: #F3F0EA; --sheet-ink: #2A2825;
     --ink: #E6E0D4; --ink-2: #A9A193; --ink-3: #7D766A;
     --rule: #3A3732; --rule-strong: #4A463F;
@@ -58,6 +62,16 @@
     --shadow-float: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
     --backdrop: rgba(0, 0, 0, .55);
   }
+}
+:root[data-theme="dark"] {
+  --desk: #1C1B19; --panel: #24221F; --leaf: #2E2B27; --sheet: #F3F0EA; --sheet-ink: #2A2825;
+  --ink: #E6E0D4; --ink-2: #A9A193; --ink-3: #7D766A;
+  --rule: #3A3732; --rule-strong: #4A463F;
+  --lamp: #E8B85C; --lamp-fill: rgba(232, 184, 92, .38);
+  --seal: #D9836E; --primary-ink: #1C1B19; --tint: #33302B; --warn: #D2B27A;
+  --shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
+  --shadow-float: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
+  --backdrop: rgba(0, 0, 0, .55);
 }
 /* 紙面（Wiki 頁、問答回答）：深色模式裡也是亮紙，紙上一律用淺色主題的字、線與燈光 */
 .wpage, .qa.assistant { --ink: var(--sheet-ink); --ink-2: #5E594F; --ink-3: #8A857B; --rule: #D3D0C8; --rule-strong: #B9B5AC;
@@ -268,8 +282,9 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .mtag.novelty { color: var(--novelty); } .mtag.method { color: var(--method); } .mtag.result { color: var(--result); }
 @media (prefers-color-scheme: dark) {
   /* 頁邊標籤在白色 PDF 頁上，維持亮色版配色；只有面板裡的標籤換成暗色版 */
-  .mtag.novelty { color: #D49A8C; } .mtag.method { color: #A7BF9E; } .mtag.result { color: #A3B6C9; }
+  :root:not([data-theme="light"]) .mtag.novelty { color: #D49A8C; } :root:not([data-theme="light"]) .mtag.method { color: #A7BF9E; } :root:not([data-theme="light"]) .mtag.result { color: #A3B6C9; }
 }
+:root[data-theme="dark"] .mtag.novelty { color: #D49A8C; } :root[data-theme="dark"] .mtag.method { color: #A7BF9E; } :root[data-theme="dark"] .mtag.result { color: #A3B6C9; }
 /* 清單：像索引卡，用細線分隔，左邊一條色線標示種類 */
 .notes { list-style: none; padding: 4px 16px 30px; margin: 0; overflow-y: auto; flex: 1; }
 .notes li { border-left: 3px solid var(--rule); padding: 10px 2px 10px 12px; cursor: pointer; border-bottom: 1px solid var(--rule);
@@ -469,8 +484,15 @@ body[data-view="login"] #userBox { display: none; }
   color: var(--ink-2); font-family: var(--font-head); font-size: 28px; font-weight: 600; text-transform: uppercase; background: var(--desk); }
 .users .card:hover .uinit, .users .card:focus-visible .uinit { border-color: var(--ink-2); color: var(--ink); }
 /* 論文卡片：整張卡都能點（開啟按鈕的 ::after 蓋滿卡片），移出按鈕疊在上面 */
-.papers { grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
-.papers .card { min-height: 140px; padding-right: 48px; }
+.papers { grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.papers .card { flex-direction: row; align-items: stretch; gap: 18px; min-height: 164px; padding-right: 48px; }
+/* 第一頁縮圖：論文是桌上的紙；背景處理中（翻譯）時外框亮燈 */
+.cthumb { flex: none; width: 96px; height: 128px; object-fit: cover; object-position: top; border-radius: var(--radius-sheet);
+  background: var(--sheet); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.card.busy .cthumb { box-shadow: 0 0 0 2px var(--lamp), 0 0 18px var(--lamp-fill); }
+.cbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cby { color: var(--ink-2); font-size: 14px; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+@media (max-width: 420px) { .cthumb { width: 64px; height: 86px; } }
 .copen { all: unset; cursor: pointer; font-family: var(--font-head); font-weight: 600; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
 .copen::after { content: ""; position: absolute; inset: 0; border-radius: var(--card-radius); }
 .copen:focus-visible::after { outline: 2px solid var(--lamp); outline-offset: 2px; }

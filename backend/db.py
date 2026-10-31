@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 import uuid
@@ -129,11 +130,11 @@ def get_paper(pid: str) -> dict | None:
 
 def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
     # tr_done / tr_total：已有對照翻譯快取的頁數 / 總頁數（給卡片上的進度圈）
-    # year：有書目快取（/cite 取過）才有，否則 null
+    # year / byline：有書目快取才有，否則 null
     sql = ("SELECT p.id, p.filename, p.title, p.created, p.tags, p.note, p.starred, "
            "json_extract(p.meta, '$.num_pages') AS tr_total, "
            "(SELECT COUNT(*) FROM cache k WHERE k.paper_id = p.id AND k.kind = 'block_translation') AS tr_done, "
-           "(SELECT json_extract(k.value, '$.year') FROM cache k WHERE k.paper_id = p.id AND k.kind = 'bib') AS year "
+           "(SELECT k.value FROM cache k WHERE k.paper_id = p.id AND k.kind = 'bib') AS bib "
            "FROM papers p ")
     args: tuple = (uid,)
     if workspace:
@@ -141,8 +142,24 @@ def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
         args = (workspace, uid)
     with conn() as c:
         rows = c.execute(sql + "WHERE p.user_id=? ORDER BY p.created DESC", args).fetchall()
-    return [{**dict(r), "tags": json.loads(r["tags"] or "[]"), "note": r["note"] or "",
-             "starred": bool(r["starred"])} for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        bib = json.loads(d.pop("bib") or "null") or {}
+        out.append({**d, "tags": json.loads(r["tags"] or "[]"), "note": r["note"] or "", "starred": bool(r["starred"]),
+                    "year": bib.get("year"), "byline": byline(bib)})
+    return out
+
+
+def byline(bib: dict) -> str | None:
+    """卡片上的一行出處：「Chen, Giuffrida, Tsaftaris，ICCVW 2023」；沒有書目資料回 None。"""
+    fams = [a.get("family") for a in bib.get("authors") or [] if a.get("family")]
+    who = (", ".join(fams) if len(fams) <= 3 else f"{fams[0]} 等") if fams else ""
+    venue = bib.get("venue") or ("arXiv" if bib.get("arxiv") else "")
+    abbr = re.search(r"\(([A-Z][\w-]{1,15})\)", venue)  # 「…Workshops (ICCVW)」取括號裡的縮寫
+    venue = abbr.group(1) if abbr else venue[:40]
+    where = " ".join(str(x) for x in (venue, bib.get("year")) if x)
+    return "，".join(x for x in (who, where) if x) or None
 
 
 def update_paper(pid: str, tags: list[str], note: str, starred: bool) -> None:

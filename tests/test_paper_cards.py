@@ -47,3 +47,21 @@ def test_cards_scoped_to_owner(papers, client, bob):
     assert bob.patch(f"/api/papers/{pid}", json={"starred": True}).status_code == 404
     assert bob.get(f"/api/papers/{pid}/cite").status_code == 404
     assert _row(client, pid)["starred"] is False
+
+
+def test_byline():
+    from backend.db import byline
+    assert byline({}) is None
+    bib = {"authors": [{"given": "F", "family": "Chen"}, {"given": "M", "family": "Giuffrida"}, {"given": "S", "family": "Tsaftaris"}],
+           "venue": "2023 IEEE/CVF International Conference on Computer Vision Workshops (ICCVW)", "year": 2023}
+    assert byline(bib) == "Chen, Giuffrida, Tsaftaris，ICCVW 2023"
+    bib["authors"].append({"family": "Lee"})
+    assert byline(bib) == "Chen 等，ICCVW 2023"
+    assert byline({"arxiv": "2401.01234", "year": 2024}) == "arXiv 2024"
+
+
+def test_thumb(client, papers, bob):
+    pid = papers["numeric"]["id"]
+    r = client.get(f"/api/papers/{pid}/thumb.png")
+    assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
+    assert bob.get(f"/api/papers/{pid}/thumb.png").status_code == 404

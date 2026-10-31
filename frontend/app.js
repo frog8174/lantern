@@ -1537,15 +1537,18 @@ $("#wsSort").onchange = (e) => { wsSort = e.target.value; store.set("lantern.wsS
 /** 用 wsPaperList 畫卡片；focusId + sel 指定重畫後焦點放回哪顆按鈕。 */
 function paintWsCards(focusId, sel) {
   const del = curWs ? "移出這個研究主題（論文本身保留）" : "刪除這篇論文";
-  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}" data-id="${escapeHTML(p.id)}">
+  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}${p.translating ? " busy" : ""}" data-id="${escapeHTML(p.id)}">
+      <img class="cthumb" src="/api/papers/${encodeURIComponent(p.id)}/thumb.png" alt="" loading="lazy">
+      <div class="cbody">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
+      ${p.byline ? `<span class="cby">${escapeHTML(p.byline)}</span>` : ""}
       ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
       ${p.note ? `<p class="cnote">${escapeHTML(p.note)}</p>` : ""}
       <div class="cfoot"><span class="ccount">${fmtDate(p.created)}</span><span class="cacts">
         <button class="cact cstar" aria-pressed="${!!p.starred}" aria-label="星號" title="${p.starred ? "取消星號" : "加星號"}">${p.starred ? "★" : "☆"}</button>
         <button class="cact cnote-btn" aria-expanded="false" title="${p.note ? "編輯備註" : "寫備註"}"><svg aria-hidden="true"><use href="#i-pen"/></svg>備註</button>
         <button class="cact ccite" aria-haspopup="dialog" title="複製引用格式"><svg aria-hidden="true"><use href="#i-quote"/></svg>引用</button>
-      </span></div>${trRing(p)}
+      </span></div></div>${trRing(p)}
       <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
     || `<p class="cards-empty">${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
   if (focusId) $(`#wsPapers .card[data-id="${CSS.escape(focusId)}"] ${sel}`)?.focus();
@@ -1962,6 +1965,19 @@ $("#wsDelete").onclick = async () => {
 $("#wsBack").onclick = showHome;
 $("#btnHome").onclick = showHome;
 const showSettings = (s) => { $("#setAutoTranslate").checked = s.auto_translate; $("#setAutoWiki").checked = !!s.auto_wiki; };
+// 主題：自動（跟系統）→ 淺色 → 深色；<head> 裡的小段程式在畫面出來前就套用
+const THEMES = { auto: "自動", light: "淺色", dark: "深色" };
+function setTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  store.set("lantern.theme", t);
+  $("#btnTheme").textContent = `主題：${THEMES[t]}`;
+}
+setTheme(store.get("lantern.theme", "auto") in THEMES ? store.get("lantern.theme", "auto") : "auto");
+$("#btnTheme").onclick = () => {
+  const keys = Object.keys(THEMES), cur = document.documentElement.dataset.theme || "auto";
+  setTheme(keys[(keys.indexOf(cur) + 1) % keys.length]);
+};
 $("#btnSettings").onclick = async () => {
   showSettings(await api("/api/me/settings"));
   $("#setDlg").showModal();
