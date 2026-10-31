@@ -34,11 +34,16 @@ import os
 import re
 from typing import Annotated, AsyncIterator, Callable, Literal
 
+import secrets
+from urllib.parse import urlencode
+
 import httpx
-from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.sessions import SessionMiddleware
 
 from . import cite, config, db, features, llm, pdf_parse, retrieval
 from .pdf_parse import parse_pdf
@@ -46,18 +51,39 @@ from .pdf_parse import parse_pdf
 app = FastAPI(title="Paper Reader")
 db.init()
 
+# 登入 session：簽章 cookie（OIDC 的 state／nonce／PKCE 也暫存在這裡）。
+# OIDC 模式一定要設 SESSION_SECRET；dev 模式沒設就每次啟動隨機產生（重啟後要重新登入）
+if config.AUTH_MODE == "oidc" and not (config.SESSION_SECRET and config.OIDC_ISSUER and config.OIDC_CLIENT_ID and config.OIDC_CLIENT_SECRET):
+    raise RuntimeError("AUTH_MODE=oidc 需要 OIDC_ISSUER、OIDC_CLIENT_ID、OIDC_CLIENT_SECRET、SESSION_SECRET（見 docs/auth.md）")
+app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET or secrets.token_urlsafe(32),
+                   session_cookie="lantern_session", max_age=config.SESSION_MAX_AGE, same_site="lax",
+                   https_only=config.PUBLIC_BASE_URL.startswith("https://"))
+oauth = OAuth()
+if config.AUTH_MODE == "oidc":
+    oauth.register("kc", client_id=config.OIDC_CLIENT_ID, client_secret=config.OIDC_CLIENT_SECRET,
+                   server_metadata_url=f"{config.OIDC_ISSUER}/.well-known/openid-configuration",
+                   client_kwargs={"scope": "openid profile email", "code_challenge_method": "S256"})
+
 PDF_DIR = config.DATA_DIR / "pdfs"
 
 
-# ---------------- 登入 ----------------
-# shortcut: unsigned dev cookie, replace current_user() when real auth lands
-def current_user(uid: str | None = Cookie(None)) -> str:
+# ---------------- 登入（docs/auth.md） ----------------
+def current_user(request: Request, uid: str | None = Cookie(None)) -> str:
+    """oidc：讀簽章 session 裡的 Keycloak sub；dev：讀測試用的 uid cookie（未簽章，只能本機開發用）。"""
+    if config.AUTH_MODE == "oidc":
+        uid = request.session.get("uid")
     if not uid or not db.get_user(uid):
         raise HTTPException(401, "not logged in")
     return uid
 
 
 Uid = Annotated[str, Depends(current_user)]
+
+
+@app.get("/api/auth/config")
+def auth_config():
+    """前端用來決定登入頁長什麼樣：dev＝使用者名片；oidc＝「用 Keycloak 登入」按鈕。"""
+    return {"mode": config.AUTH_MODE}
 
 
 @app.get("/api/auth/users")
@@ -80,9 +106,52 @@ def login(body: LoginIn, response: Response):
     return u
 
 
+@app.get("/api/auth/login")
+async def oidc_login(request: Request):
+    """導到 Keycloak 登入頁（Authorization Code + PKCE S256；state、nonce 存在 session）。"""
+    if config.AUTH_MODE != "oidc":
+        raise HTTPException(404, "Not Found")
+    return await oauth.kc.authorize_redirect(request, f"{config.PUBLIC_BASE_URL}/api/auth/callback")
+
+
+@app.get("/api/auth/callback")
+async def oidc_callback(request: Request):
+    """Keycloak 帶 code 回來：換 token、驗 ID token（簽章、iss、aud、exp、nonce 由 Authlib 檢查），建立或更新使用者。"""
+    if config.AUTH_MODE != "oidc":
+        raise HTTPException(404, "Not Found")
+    try:
+        token = await oauth.kc.authorize_access_token(request)
+    except OAuthError as e:  # 使用者按取消、state 不符、code 過期…回首頁顯示登入失敗
+        print(f"[oidc] callback failed: {e.error}")
+        return RedirectResponse("/?login_error=1", status_code=302)
+    info = token.get("userinfo") or {}
+    sub = info.get("sub")
+    if not sub:
+        return RedirectResponse("/?login_error=1", status_code=302)
+    db.upsert_user(sub, info.get("name") or info.get("preferred_username") or info.get("email") or sub, info.get("email") or "")
+    request.session.clear()
+    request.session.update({"uid": sub, "id_token": token.get("id_token", "")})
+    return RedirectResponse("/", status_code=302)
+
+
 @app.post("/api/auth/logout")
-def logout(response: Response):
+async def logout(request: Request, response: Response):
+    """dev：清 cookie。oidc：清 session，並回傳 Keycloak 的登出網址讓前端導過去（一併結束 Keycloak 那邊的登入）。"""
     response.delete_cookie("uid")
+    if config.AUTH_MODE != "oidc":
+        return {"ok": True}
+    id_token = request.session.get("id_token", "")
+    request.session.clear()
+    meta = await oauth.kc.load_server_metadata()
+    query = {"client_id": config.OIDC_CLIENT_ID, "post_logout_redirect_uri": f"{config.PUBLIC_BASE_URL}/"}
+    if id_token:
+        query["id_token_hint"] = id_token
+    return {"ok": True, "logout_url": f"{meta['end_session_endpoint']}?{urlencode(query)}"}
+
+
+@app.get("/api/livez")
+def livez():
+    """給 k8s probe：只確認程式活著，不碰模型（/api/health 會真的呼叫模型）。"""
     return {"ok": True}
 
 

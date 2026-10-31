@@ -74,8 +74,11 @@ def init() -> None:
     with conn() as c:
         c.executescript(SCHEMA)
         # 舊資料庫升級：users 加上 settings 欄（JSON 物件）
-        if "settings" not in {r["name"] for r in c.execute("PRAGMA table_info(users)")}:
+        ucols = {r["name"] for r in c.execute("PRAGMA table_info(users)")}
+        if "settings" not in ucols:
             c.execute("ALTER TABLE users ADD COLUMN settings TEXT DEFAULT '{}'")
+        if "email" not in ucols:  # Keycloak 登入帶回的 email
+            c.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
         # papers 加上備註、星號（docs/paper-cards.md）
         cols = {r["name"] for r in c.execute("PRAGMA table_info(papers)")}
         if "note" not in cols:
@@ -104,6 +107,14 @@ def get_settings(uid: str) -> dict:
 def set_settings(uid: str, settings: dict) -> None:
     with conn() as c:
         c.execute("UPDATE users SET settings=? WHERE id=?", (json.dumps(settings, ensure_ascii=False), uid))
+
+
+def upsert_user(uid: str, name: str, email: str) -> None:
+    """OIDC 登入：第一次進來就建一筆；之後每次登入同步名稱與 email。"""
+    with conn() as c:
+        c.execute("INSERT INTO users (id, name, created, email) VALUES (?,?,?,?) "
+                  "ON CONFLICT(id) DO UPDATE SET name=excluded.name, email=excluded.email",
+                  (uid, name, time.time(), email))
 
 
 def list_users() -> list[dict]:

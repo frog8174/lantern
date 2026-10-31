@@ -543,6 +543,11 @@ body[data-view="login"] #userBox { display: none; }
 .login-sis { margin-bottom: 10px; line-height: 0; }
 .users { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .users .card { align-items: center; text-align: center; padding: 26px 18px 20px; gap: 10px; }
+/* Keycloak 登入：唯一的主要按鈕，置中 */
+.users .oidc-login { grid-column: 1 / -1; justify-self: center; justify-content: center; min-width: 260px; padding: 18px 28px;
+  background: var(--ink); color: var(--primary-ink); border-color: var(--ink); text-decoration: none; }
+.users .oidc-login .cname { font-family: var(--font-tool); font-size: 18px; font-weight: 600; }
+.users .oidc-login:hover, .users .oidc-login:focus-visible { background: var(--ink); border-color: var(--lamp); }
 .uinit { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--rule-strong);
   color: var(--ink-2); font-family: var(--font-head); font-size: 28px; font-weight: 600; text-transform: uppercase; background: var(--desk); }
 .users .card:hover .uinit, .users .card:focus-visible .uinit { border-color: var(--ink-2); color: var(--ink); }

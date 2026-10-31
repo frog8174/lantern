@@ -98,8 +98,15 @@ LLM_MOCK = _bool("LLM_MOCK", False)
 
 # ---- 登入 ----
 # dev：測試登入（選使用者、免密碼，cookie 未簽章），只能自己開發用
-AUTH_MODE = os.environ.get("AUTH_MODE", "dev").lower()
+AUTH_MODE = os.environ.get("AUTH_MODE", "dev").lower()  # dev＝選測試使用者；oidc＝Keycloak（docs/auth.md）
 TEST_USERS = [u.strip() for u in os.environ.get("TEST_USERS", "alice,bob").split(",") if u.strip()]
+# OIDC（Keycloak）。OIDC_ISSUER 必須和 token 的 iss 完全一樣；PUBLIC_BASE_URL 用來組 redirect URI
+OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/")
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:7800").rstrip("/")
+SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
+SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", 8 * 3600))
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 (DATA_DIR / "pdfs").mkdir(exist_ok=True)

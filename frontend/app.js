@@ -1629,10 +1629,18 @@ let workspaces = [], curWs = null;  // curWs = 目前的 workspace；null = 全�
 async function showLogin(expired = false) {
   setView("login");
   $("#loginSis").innerHTML = sisyphus(expired ? "rest" : "push", 160, "slow");
-  $("#loginView .vlede").textContent = expired ? "登入已失效，點一下自己的名片重新進入。"
-    : "測試登入：免密碼，點一下名片就進入自己的論文庫。";
   const g = $("#userGrid");
   g.innerHTML = "";
+  const mode = (await api("/api/auth/config").catch(() => ({ mode: "dev" }))).mode;
+  if (mode === "oidc") {  // Keycloak：整頁導去登入，回來時後端已建好 session
+    const failed = new URLSearchParams(location.search).has("login_error");
+    $("#loginView .vlede").textContent = failed ? "登入沒有完成：請再試一次；若一直失敗，請聯絡管理員確認帳號。"
+      : expired ? "登入已失效，請重新登入。" : "用 Toolmen 帳號登入，進入自己的論文庫。";
+    g.innerHTML = '<a class="card oidc-login" href="/api/auth/login"><span class="cname">用 Toolmen 帳號登入</span></a>';
+    return;
+  }
+  $("#loginView .vlede").textContent = expired ? "登入已失效，點一下自己的名片重新進入。"
+    : "測試登入：免密碼，點一下名片就進入自己的論文庫。";
   try {
     const users = await api("/api/auth/users");
     g.innerHTML = users.length
@@ -2209,7 +2217,8 @@ $("#setAutoTranslate").onchange = $("#setAutoWiki").onchange = async () => {
 };
 $("#setClose").onclick = () => $("#setDlg").close();
 $("#btnLogout").onclick = async () => {
-  await api("/api/auth/logout", { method: "POST" });
+  const r = await api("/api/auth/logout", { method: "POST" });
+  if (r.logout_url) { location.href = r.logout_url; return; }  // Keycloak：連同 Keycloak 那邊一起登出，再回到首頁
   history.replaceState(null, "", location.pathname);
   showLogin();
 };
