@@ -1,6 +1,8 @@
 {
+  "0": "app.js",
   "3": "db.py",
   "4": "pdf_parse.py",
+  "5": "llm.py",
   "6": "features.py",
   "7": "retrieval.py",
   "8": "fake_api.py",
@@ -8,9 +10,15 @@
   "14": "CLAUDE.md",
   "15": "conftest.py",
   "16": "Workspace LLM Wiki（MVP）",
-  "17": "test_units.py",
+  "17": "escapeHTML",
   "18": "s2_paper_id",
-  "19": "功能對照",
+  "19": "drawHighlights",
   "20": "complete_json",
-  "21": "auto_highlight"
+  "21": "aiCard",
+  "22": "streamInto",
+  "23": "pumpTranslation",
+  "24": "local_context",
+  "25": "_to_claude",
+  "26": "drawOutline",
+  "27": "Lantern AI Paper Reader"
 }
