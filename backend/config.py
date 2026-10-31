@@ -60,7 +60,7 @@ LLM_CONCURRENCY = max(1, int(os.environ.get("LLM_CONCURRENCY", "4")))
 # 環境變數 LLM_MODEL_<元件>，例：LLM_MODEL_TRANSLATE=claude-haiku-5-5。
 # 名稱前加 "openai:" 或 "anthropic:" 可以讓這個元件換服務商，
 # 例：LLM_PROVIDER=anthropic 但 LLM_MODEL_TRANSLATE=openai:qwen3.5-9b → 翻譯走本機 vLLM（LLM_BASE_URL）
-TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest")
+TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest", "wiki")
 TASK_MODELS = {t: os.environ.get(f"LLM_MODEL_{t.upper()}", "") for t in TEXT_TASKS}
 # 各元件的思考深度（只用在 Claude；留空 = LLM_EFFORT）。量大又單純的工作預設 low
 _EFFORT_DEFAULTS = {"translate": "low", "outline": "low", "suggest": "low"}

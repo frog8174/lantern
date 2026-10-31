@@ -691,6 +691,42 @@ def remove_from_workspace(wid: str, pid: str, uid: Uid):
     return {"ok": True}
 
 
+# ---------------- Workspace wiki（docs/wiki.md）----------------
+_wiki_running: set[str] = set()  # shortcut: in-process lock, breaks with multiple uvicorn workers
+
+
+@app.get("/api/workspaces/{wid}/wiki")
+def wiki(wid: str, uid: Uid):
+    _ws_or_404(wid, uid)
+    return {"pages": db.wiki_pages(wid), "pending": len(db.wiki_pending(wid))}
+
+
+@app.get("/api/workspaces/{wid}/wiki/{slug}")
+def wiki_page(wid: str, slug: str, uid: Uid):
+    _ws_or_404(wid, uid)
+    page = db.wiki_page(wid, slug)
+    if not page:
+        raise HTTPException(404, "wiki page not found")
+    return page
+
+
+@app.post("/api/workspaces/{wid}/wiki/update")
+async def wiki_update(wid: str, uid: Uid):
+    _ws_or_404(wid, uid)
+    if wid in _wiki_running:
+        raise HTTPException(409, "wiki update already running")
+    _wiki_running.add(wid)
+
+    async def run() -> AsyncIterator[str]:
+        try:
+            async for step in features.update_wiki(wid):
+                yield json.dumps(step, ensure_ascii=False)
+        finally:
+            _wiki_running.discard(wid)
+
+    return sse(run())
+
+
 @app.get("/api/health")
 async def health():
     """檢查每個模型角色的連線：在瀏覽器打開 /api/health 就知道哪個 API 沒接好。

@@ -7,6 +7,7 @@
 - annotations ：使用者的螢光筆與註解
 - messages    ：每篇論文的聊天紀錄
 - users / workspaces / workspace_papers：使用者、各自的 workspace、論文 ↔ workspace（多對多）
+- wiki_pages / wiki_ingested：workspace 的 LLM wiki 頁面、已整理過的論文（規格見 docs/wiki.md）
 """
 from __future__ import annotations
 
@@ -42,6 +43,13 @@ CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, created REAL, 
 CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, created REAL);
 CREATE TABLE IF NOT EXISTS workspace_papers (
   workspace_id TEXT, paper_id TEXT, added REAL, PRIMARY KEY (workspace_id, paper_id)
+);
+CREATE TABLE IF NOT EXISTS wiki_pages (
+  workspace_id TEXT, slug TEXT, title TEXT, markdown TEXT, sources TEXT, updated REAL,
+  PRIMARY KEY (workspace_id, slug)
+);
+CREATE TABLE IF NOT EXISTS wiki_ingested (
+  workspace_id TEXT, paper_id TEXT, ingested REAL, PRIMARY KEY (workspace_id, paper_id)
 );
 """
 
@@ -145,6 +153,7 @@ def delete_paper(pid: str) -> None:
             col = "id" if t == "papers" else "paper_id"
             c.execute(f"DELETE FROM {t} WHERE {col}=?", (pid,))
         c.execute("DELETE FROM workspace_papers WHERE paper_id=?", (pid,))
+        c.execute("DELETE FROM wiki_ingested WHERE paper_id=?", (pid,))  # shortcut: 頁面保留，內容可能提到已刪的論文
 
 
 # ---------- workspaces ----------
@@ -179,7 +188,8 @@ def rename_workspace(wid: str, name: str) -> None:
 def delete_workspace(wid: str) -> None:
     with conn() as c:
         c.execute("DELETE FROM workspaces WHERE id=?", (wid,))
-        c.execute("DELETE FROM workspace_papers WHERE workspace_id=?", (wid,))
+        for t in ("workspace_papers", "wiki_pages", "wiki_ingested"):
+            c.execute(f"DELETE FROM {t} WHERE workspace_id=?", (wid,))
 
 
 def add_to_workspace(wid: str, pid: str) -> None:
@@ -190,6 +200,41 @@ def add_to_workspace(wid: str, pid: str) -> None:
 def remove_from_workspace(wid: str, pid: str) -> None:
     with conn() as c:
         c.execute("DELETE FROM workspace_papers WHERE workspace_id=? AND paper_id=?", (wid, pid))
+
+
+# ---------- workspace wiki ----------
+def wiki_pages(wid: str) -> list[dict]:
+    with conn() as c:
+        rows = c.execute("SELECT slug, title, updated FROM wiki_pages WHERE workspace_id=? "
+                         "ORDER BY slug != 'index', title", (wid,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def wiki_page(wid: str, slug: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT slug, title, markdown, sources, updated FROM wiki_pages "
+                      "WHERE workspace_id=? AND slug=?", (wid, slug)).fetchone()
+    return {**dict(r), "sources": json.loads(r["sources"] or "[]")} if r else None
+
+
+def wiki_save(wid: str, slug: str, title: str, markdown: str, sources: list[str]) -> None:
+    with conn() as c:
+        c.execute("INSERT OR REPLACE INTO wiki_pages VALUES (?,?,?,?,?,?)",
+                  (wid, slug, title, markdown, json.dumps(sources), time.time()))
+
+
+def wiki_pending(wid: str) -> list[str]:
+    """workspace 裡還沒整理進 wiki 的論文（舊到新）。"""
+    with conn() as c:
+        rows = c.execute("SELECT wp.paper_id FROM workspace_papers wp LEFT JOIN wiki_ingested i "
+                         "ON i.workspace_id = wp.workspace_id AND i.paper_id = wp.paper_id "
+                         "WHERE wp.workspace_id=? AND i.paper_id IS NULL ORDER BY wp.added", (wid,)).fetchall()
+    return [r["paper_id"] for r in rows]
+
+
+def wiki_mark_ingested(wid: str, pid: str) -> None:
+    with conn() as c:
+        c.execute("INSERT OR REPLACE INTO wiki_ingested VALUES (?,?,?)", (wid, pid, time.time()))
 
 
 # ---------- chunks ----------

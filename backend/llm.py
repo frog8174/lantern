@@ -325,6 +325,9 @@ def _mock_answer(messages: list) -> str:
 
 def _mock_json(messages: list):
     prompt = json.dumps(messages, ensure_ascii=False)
+    if "paper_page" in prompt:  # workspace wiki 規劃
+        return {"paper_page": {"title": "MOCK 論文頁", "markdown": "（MOCK）論文頁 [[mock-concept]]"},
+                "concepts": [{"slug": "mock-concept", "title": "Mock Concept", "note": "MOCK 重點"}]}
     if "highlight" in prompt.lower():
         return {"novelty": [], "method": [], "result": []}
     return {"outline": []}
