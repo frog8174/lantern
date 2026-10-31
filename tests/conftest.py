@@ -97,6 +97,13 @@ def bob(fake_server):
         yield c
 
 
+@pytest.fixture
+def allow_duplicates(monkeypatch):
+    """關掉重複偵測：測試要把同一份 PDF 當新論文再匯入一次（之後會刪掉，不能刪到共用的那篇）。"""
+    from backend import db
+    monkeypatch.setattr(db, "find_duplicate", lambda *a, **k: None)
+
+
 @pytest.fixture(scope="session")
 def papers(client, pdfs) -> dict[str, dict]:
     """把三份測試 PDF 都匯入一次，整個測試共用。"""

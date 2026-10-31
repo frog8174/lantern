@@ -197,10 +197,12 @@ $("#libSearch").addEventListener("keydown", async (e) => {
 $("#searchClose").onclick = () => { $("#searchOut").hidden = true; };
 
 async function ingest(promise, st = $("#ingestStatus")) {
+  const stay = document.body.dataset.view === "ws";  // 研究主題頁上傳：留在原頁，新卡片排最前面
   st.textContent = "解析中…（擷取文字、建立索引）";
   try {
     const res = await promise;
-    st.textContent = `完成：${res.num_pages} 頁、${res.chunks} 個段落`;
+    st.textContent = res.duplicate ? `這篇已經在論文庫裡${stay && curWs ? "，已加入這個研究主題" : ""}`
+      : `完成：${res.num_pages} 頁、${res.chunks} 個段落`;
     if (res.scanned_pages) {
       // 掃描版：沒文字層的頁要靠 OCR，否則 AI 讀不到內容
       const msg = res.ocr_pages
@@ -211,7 +213,7 @@ async function ingest(promise, st = $("#ingestStatus")) {
       st.innerHTML += `<br><span class="${res.ocr_pages ? "warn" : "err"}">${escapeHTML(msg)}</span>`;
     }
     await loadLibrary();
-    openPaper(res.id);
+    if (stay) renderWsCards(curWs); else openPaper(res.id);
   } catch (e) {
     st.innerHTML = `<span class="err">失敗：${escapeHTML(e.message)}</span>`;
   }
@@ -1593,7 +1595,7 @@ $("#wsGrid").onclick = async (e) => {
   const b = e.target.closest("button.card");
   if (!b) return;
   if (!b.dataset.new) return showWs(workspaces.find((w) => w.id === b.dataset.id) || null);
-  const name = prompt("新研究主題的名稱（例如：RAG、待讀）")?.trim();
+  const name = await inlineInput(b, "新研究主題的名稱", "", "例如：RAG、待讀");
   if (name) showWs(await api("/api/workspaces", { method: "POST", body: { name } }));
 };
 
@@ -1613,17 +1615,18 @@ async function renderWsCards(ws) {
   wsPaperList = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
   // 正在寫備註或看引用時不重畫，免得打到一半被洗掉；關掉編輯器／對話框時會用最新清單重畫
   if (!cardsBusy()) paintWsCards();
-  // 有論文還在背景翻譯：過幾秒再刷新，直到都跑完或離開這頁
-  if (wsPaperList.some((p) => p.translating)) setTimeout(() => {
+  // 有論文還在背景取書目或翻譯：過幾秒再刷新，直到都跑完或離開這頁
+  if (wsPaperList.some((p) => p.translating || p.fetching_bib)) setTimeout(() => {
     if (document.body.dataset.view === "ws" && curWs === ws) renderWsCards(ws);
   }, 4000);
 }
-const cardsBusy = () => !!$("#wsPapers .cnote-ed") || $("#citeDlg").open;
+const cardsBusy = () => !!$("#wsPapers .cnote-ed, #wsPapers [data-armed]") || $("#citeDlg").open;
 
 // 排序在前端做（清單已經抓回來了）；同分時用加入時間新→舊
+// added：加入這個研究主題的時間（全部論文 = 上傳時間），重複上傳加進來的舊論文也排最前面
 const SORTS = {
-  new: (a, b) => b.created - a.created,
-  old: (a, b) => a.created - b.created,
+  new: (a, b) => b.added - a.added,
+  old: (a, b) => a.added - b.added,
   title: (a, b) => (a.title || a.filename).localeCompare(b.title || b.filename, "zh-Hant", { sensitivity: "base" }) || b.created - a.created,
   star: (a, b) => !!b.starred - !!a.starred || b.created - a.created,
   // 沒年份當 -∞ 排最後；兩篇都沒有會得 NaN，落到加入時間
@@ -1637,11 +1640,12 @@ $("#wsSort").onchange = (e) => { wsSort = e.target.value; store.set("lantern.wsS
 /** 用 wsPaperList 畫卡片；focusId + sel 指定重畫後焦點放回哪顆按鈕。 */
 function paintWsCards(focusId, sel) {
   const del = curWs ? "移出這個研究主題（論文本身保留）" : "刪除這篇論文";
-  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}${p.translating ? " busy" : ""}" data-id="${escapeHTML(p.id)}">
+  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}${p.translating || p.fetching_bib ? " busy" : ""}" data-id="${escapeHTML(p.id)}">
       <img class="cthumb" src="/api/papers/${encodeURIComponent(p.id)}/thumb.png" alt="" loading="lazy">
       <div class="cbody">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
       ${p.byline ? `<span class="cby">${escapeHTML(p.byline)}</span>` : ""}
+      ${p.fetching_bib || p.translating ? `<span class="cstage">${[p.fetching_bib && "取得書目中", p.translating && "翻譯中"].filter(Boolean).join("、")}</span>` : ""}
       ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
       ${p.note ? `<p class="cnote">${escapeHTML(p.note)}</p>` : ""}
       <div class="cfoot"><span class="ccount">${fmtDate(p.created)}</span><span class="cacts">
@@ -1705,10 +1709,10 @@ $("#wsPapers").onclick = async (e) => {
   }
   if (e.target.closest(".cnote-btn")) return card.querySelector(".cnote-ed")?.focus() ?? openNote(card, cardPaper(id));
   if (e.target.closest(".ccite")) return openCiteDlg(cardPaper(id));
-  if (!e.target.closest(".cdel")) return openPaper(id);
-  if (curWs) await api(`/api/workspaces/${curWs.id}/papers/${id}`, { method: "DELETE" });
-  else if (confirm("刪除這篇論文與所有標註？")) await api(`/api/papers/${id}`, { method: "DELETE" });
-  else return;
+  const del = e.target.closest(".cdel");
+  if (!del) return openPaper(id);
+  if (!armDelete(del)) return;
+  await api(curWs ? `/api/workspaces/${curWs.id}/papers/${id}` : `/api/papers/${id}`, { method: "DELETE" });
   showWs();
 };
 
@@ -1963,29 +1967,17 @@ $("#qaForm").onsubmit = (e) => {
 $("#qaInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#qaForm").requestSubmit(); }
 });
-// 不用 confirm()：第一下只是「上膛」，三秒內再按一次才真的清空
 $("#askClear").onclick = async (e) => {
-  const b = e.currentTarget;
-  if (!b.dataset.armed) {
-    b.dataset.armed = "1";
-    b.textContent = "再按一次清空";
-    setTimeout(() => { delete b.dataset.armed; b.textContent = "清空對話"; }, 3000);
-    return;
-  }
+  if (!armDelete(e.currentTarget)) return;
   await api(`/api/workspaces/${curWs.id}/ask`, { method: "DELETE" });
   loadAsk();
 };
 $("#wsAsk").onclick = async (e) => {
   const del = e.target.closest(".qdel");
-  if (del) {  // 在 summary 裡：不要觸發收合；同「清空對話」，三秒內按第二下才刪
+  if (del) {  // 在 summary 裡：不要觸發收合
     e.preventDefault();
     const item = del.closest(".qitem");
-    if (!del.dataset.armed) {
-      del.dataset.armed = "1";
-      del.textContent = "再按一次刪除";
-      setTimeout(() => { delete del.dataset.armed; del.textContent = "×"; }, 3000);
-      return;
-    }
+    if (!armDelete(del)) return;
     try {
       await api(`/api/workspaces/${curWs.id}/ask/${item.dataset.id}`, { method: "DELETE" });
       item.remove();
@@ -2033,8 +2025,8 @@ $("#wsFile").onchange = (e) => {
   e.target.value = "";  // 同一個檔案再選一次也要觸發
   if (f) uploadFile(f, curWs?.id, $("#wsStatus"));
 };
-$("#wsArxiv").onclick = () => {
-  const url = prompt("arXiv 編號或 PDF 網址")?.trim();
+$("#wsArxiv").onclick = async (e) => {
+  const url = await inlineInput(e.currentTarget, "arXiv 編號或 PDF 網址", "", "arXiv 編號或 PDF 網址");
   if (url) importArxiv(url, curWs?.id, $("#wsStatus"));
 };
 $("#wsAdd").onclick = async () => {
@@ -2053,17 +2045,65 @@ $("#addList").onclick = async (e) => {
   showWs();
 };
 $("#addClose").onclick = () => $("#addDlg").close();
-$("#wsRename").onclick = async () => {
-  const name = prompt("研究主題名稱", curWs.name)?.trim();
+$("#wsRename").onclick = async (e) => {
+  const name = await inlineInput(e.currentTarget, "研究主題名稱", curWs.name);
   if (name && name !== curWs.name) showWs(await api(`/api/workspaces/${curWs.id}`, { method: "PATCH", body: { name } }));
 };
-$("#wsDelete").onclick = async () => {
-  if (!confirm(`刪除研究主題「${curWs.name}」？裡面的論文不會刪除，仍在「全部論文」。`)) return;
+$("#wsDelete").onclick = async (e) => {
+  if (!armDelete(e.currentTarget)) return;
   await api(`/api/workspaces/${curWs.id}`, { method: "DELETE" });
   showHome();
 };
 $("#wsBack").onclick = showHome;
 $("#btnHome").onclick = () => showWs(S.fromWs || null);
+
+/** 就地輸入框（取代 prompt()）：暫時換掉 anchor 按鈕。Enter 確認、Esc 或離開取消；回傳去掉空白的值，取消回 null。 */
+function inlineInput(anchor, label, value = "", placeholder = "") {
+  return new Promise((resolve) => {
+    const inp = document.createElement("input");
+    inp.className = "inline-in";
+    inp.value = value;
+    inp.placeholder = placeholder;
+    inp.setAttribute("aria-label", `${label}（Enter 確認，Esc 取消）`);
+    anchor.hidden = true;
+    anchor.after(inp);
+    inp.focus();
+    inp.select();
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      inp.remove();
+      anchor.hidden = false;
+      if (v === null) anchor.focus();  // 取消：焦點回到原按鈕
+      resolve(v);
+    };
+    inp.onkeydown = (e) => {
+      if (e.isComposing) return;
+      if (e.key === "Enter") { e.preventDefault(); finish(inp.value.trim() || null); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(null); }
+    };
+    inp.onblur = () => finish(null);
+  });
+}
+
+// 刪除一律按兩下（不用 confirm()）：第一下按鈕變朱色、換成一句俚語提醒刪了救不回來，3 秒內再按才刪
+const DELETE_IDIOMS = ["覆水難收，再按一次", "潑出去的水收不回來", "一去不復返，確定？", "船過水無痕，真的要刪？", "此去無回頭，再按一次"];
+let idiomTurn = 0;
+/** 回傳 true = 已上膛的第二下，該刪了；false = 第一下，只上膛。 */
+function armDelete(b) {
+  if (b.dataset.armed) return true;
+  const html = b.innerHTML, label = b.getAttribute("aria-label"), msg = DELETE_IDIOMS[idiomTurn++ % DELETE_IDIOMS.length];
+  b.dataset.armed = "1";
+  b.textContent = msg;
+  if (label) b.setAttribute("aria-label", msg);
+  setTimeout(() => {
+    delete b.dataset.armed;
+    b.innerHTML = html;
+    if (label) b.setAttribute("aria-label", label);
+  }, 3000);
+  return false;
+}
 const showSettings = (s) => { $("#setAutoTranslate").checked = s.auto_translate; $("#setAutoWiki").checked = !!s.auto_wiki; };
 // 主題：自動（跟系統）→ 淺色 → 深色；<head> 裡的小段程式在畫面出來前就套用
 const THEMES = { auto: "自動（跟隨系統）", light: "淺色", dark: "深色" };

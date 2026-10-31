@@ -7,7 +7,7 @@ from backend import config, db, main
 from tests.conftest import sse
 
 
-def test_wiki_update(client, bob, pdfs, monkeypatch):
+def test_wiki_update(client, bob, pdfs, monkeypatch, allow_duplicates):
     monkeypatch.setattr(config, "LLM_MOCK", True)
     w = client.post("/api/workspaces", json={"name": "Wiki"}).json()
     base = f"/api/workspaces/{w['id']}/wiki"
@@ -54,7 +54,7 @@ def test_wiki_update(client, bob, pdfs, monkeypatch):
     assert db.wiki_pages(w["id"]) == []
 
 
-def test_wiki_ask_and_backlinks(client, bob, pdfs, monkeypatch):
+def test_wiki_ask_and_backlinks(client, bob, pdfs, monkeypatch, allow_duplicates):
     monkeypatch.setattr(config, "LLM_MOCK", True)
     w = client.post("/api/workspaces", json={"name": "Ask"}).json()
     ask = f"/api/workspaces/{w['id']}/ask"

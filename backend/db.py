@@ -25,7 +25,7 @@ DB_PATH = config.DATA_DIR / "app.db"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS papers (
   id TEXT PRIMARY KEY, user_id TEXT, filename TEXT, title TEXT, created REAL, meta TEXT, tags TEXT DEFAULT '[]',
-  note TEXT DEFAULT '', starred INTEGER DEFAULT 0
+  note TEXT DEFAULT '', starred INTEGER DEFAULT 0, sha256 TEXT
 );
 CREATE TABLE IF NOT EXISTS chunks (
   paper_id TEXT, idx INTEGER, page INTEGER, text TEXT, bbox TEXT, emb BLOB,
@@ -82,6 +82,8 @@ def init() -> None:
             c.execute("ALTER TABLE papers ADD COLUMN note TEXT DEFAULT ''")
         if "starred" not in cols:
             c.execute("ALTER TABLE papers ADD COLUMN starred INTEGER DEFAULT 0")
+        if "sha256" not in cols:  # 重複偵測用；舊論文沒有，靠 DOI／標題比對
+            c.execute("ALTER TABLE papers ADD COLUMN sha256 TEXT")
         # 測試使用者：user id = 名字
         c.executemany("INSERT OR IGNORE INTO users (id, name, created) VALUES (?,?,?)",
                       [(u, u, time.time()) for u in config.TEST_USERS])
@@ -114,10 +116,31 @@ def new_id() -> str:
 
 
 # ---------- papers ----------
-def add_paper(uid: str, pid: str, filename: str, title: str, meta: dict) -> None:
+def add_paper(uid: str, pid: str, filename: str, title: str, meta: dict, sha256: str | None = None) -> None:
     with conn() as c:
-        c.execute("INSERT INTO papers (id, user_id, filename, title, created, meta) VALUES (?,?,?,?,?,?)",
-                  (pid, uid, filename, title, time.time(), json.dumps(meta, ensure_ascii=False)))
+        c.execute("INSERT INTO papers (id, user_id, filename, title, created, meta, sha256) VALUES (?,?,?,?,?,?,?)",
+                  (pid, uid, filename, title, time.time(), json.dumps(meta, ensure_ascii=False), sha256))
+
+
+def norm_title(t: str | None) -> str:
+    """比對重複用：不分大小寫、去掉空白與標點。「Untitled」（抓不到標題）不算。"""
+    t = re.sub(r"[\W_]+", "", (t or "").casefold())
+    return "" if t == "untitled" else t
+
+
+def find_duplicate(uid: str, sha256: str | None = None, doi: str | None = None, title: str | None = None) -> str | None:
+    """使用者庫裡相同檔案（sha256）、相同 DOI（書目快取）或相同正規化標題的論文 id。"""
+    doi, title = (doi or "").lower(), norm_title(title)
+    with conn() as c:
+        rows = c.execute("SELECT p.id, p.title, p.sha256, "
+                         "(SELECT k.value FROM cache k WHERE k.paper_id = p.id AND k.kind = 'bib') AS bib "
+                         "FROM papers p WHERE p.user_id=? ORDER BY p.created", (uid,)).fetchall()
+    for r in rows:
+        bib = json.loads(r["bib"] or "null") or {}
+        if (sha256 and r["sha256"] == sha256) or (title and norm_title(r["title"]) == title) \
+                or (doi and (bib.get("doi") or "").lower() == doi):
+            return r["id"]
+    return None
 
 
 def get_paper(pid: str) -> dict | None:
@@ -131,7 +154,9 @@ def get_paper(pid: str) -> dict | None:
 def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
     # tr_done / tr_total：已有對照翻譯快取的頁數 / 總頁數（給卡片上的進度圈）
     # year / byline：有書目快取才有，否則 null
+    # added：加入研究主題的時間（全部論文 = 上傳時間）
     sql = ("SELECT p.id, p.filename, p.title, p.created, p.tags, p.note, p.starred, "
+           + ("w.added" if workspace else "p.created") + " AS added, "
            "json_extract(p.meta, '$.num_pages') AS tr_total, "
            "(SELECT COUNT(*) FROM cache k WHERE k.paper_id = p.id AND k.kind = 'block_translation') AS tr_done, "
            "(SELECT k.value FROM cache k WHERE k.paper_id = p.id AND k.kind = 'bib') AS bib "
@@ -141,7 +166,8 @@ def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
         sql += "JOIN workspace_papers w ON w.paper_id = p.id AND w.workspace_id = ? "
         args = (workspace, uid)
     with conn() as c:
-        rows = c.execute(sql + "WHERE p.user_id=? ORDER BY p.created DESC", args).fetchall()
+        # 研究主題裡依加入時間：既有論文（例如重複上傳）加進來也排最前面
+        rows = c.execute(sql + "WHERE p.user_id=? ORDER BY added DESC", args).fetchall()
     out = []
     for r in rows:
         d = dict(r)

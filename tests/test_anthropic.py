@@ -96,7 +96,7 @@ def test_auto_highlight_json(claude, papers, client):
     assert hls and all(h["rects"] for h in hls)
 
 
-def test_ocr_scanned_pdf(claude, client, pdfs):
+def test_ocr_scanned_pdf(claude, client, pdfs, allow_duplicates):
     with open(pdfs["scanned"], "rb") as f:
         r = client.post("/api/papers", files={"file": ("scan2.pdf", f, "application/pdf")}).json()
     assert r["ocr_pages"] == 3 and r["ocr_error"] is None and r["chunks"] > 0
