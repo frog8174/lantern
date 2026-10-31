@@ -7,16 +7,14 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # 二選一簽憑證：
-    # cert-manager.io/cluster-issuer: TODO                          # 用 cert-manager（spec.tls 的 secretName 會由它建立）
-    # traefik.ingress.kubernetes.io/router.tls.certresolver: TODO   # 用 Traefik 內建 ACME（這時可以拿掉 spec.tls.secretName）
+    cert-manager.io/cluster-issuer: cert-manager-prod   # cert-manager 依 spec.tls 建立 lantern-tls
 spec:
-  ingressClassName: traefik   # TODO: 確認叢集的 IngressClass 名稱（kubectl get ingressclass）
+  ingressClassName: traefik   # 確認：kubectl get ingressclass
   tls:
-    - hosts: [LANTERN_HOST]   # TODO: Lantern 公開網域
+    - hosts: [lantern.toolmen.bime.ntu.edu.tw]
       secretName: lantern-tls
   rules:
-    - host: LANTERN_HOST      # TODO
+    - host: lantern.toolmen.bime.ntu.edu.tw
       http:
         paths:
           - path: /

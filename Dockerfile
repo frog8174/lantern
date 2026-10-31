@@ -9,7 +9,8 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-ins
 
 FROM python:3.12-slim-bookworm
 WORKDIR /app
-RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin lantern
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin lantern \
+ && mkdir /data && chown 10001:10001 /data   # 沒掛 volume 也能啟動（k8s 會掛 PVC 蓋過去）
 COPY --from=build /app/.venv /app/.venv
 COPY backend ./backend
 COPY frontend ./frontend

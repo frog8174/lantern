@@ -5,7 +5,7 @@ metadata:
   name: lantern-data
 spec:
   accessModes: [ReadWriteOnce]
-  # storageClassName: TODO     # 叢集預設以外的 StorageClass 才需要填
+  storageClassName: rook-ceph-hdd-block
   resources:
     requests:
       storage: 20Gi

@@ -4,11 +4,26 @@ kind: ConfigMap
 metadata:
   name: lantern-config
 data:
+  # 登入（docs/auth.md）
   AUTH_MODE: oidc
   OIDC_ISSUER: https://keycloak.toolmen.bime.ntu.edu.tw/realms/Toolmen_application
-  OIDC_CLIENT_ID: lantern                       # TODO: 正式環境的 Keycloak client（和本機的 lantern-local 分開）
-  PUBLIC_BASE_URL: https://LANTERN_HOST         # TODO: Lantern 公開網域，必須和 Ingress host 一致
+  OIDC_CLIENT_ID: lantern-local        # 沿用本機的 client；它的 redirect URI 要加上正式網域（docs/deploy.md）
+  PUBLIC_BASE_URL: https://lantern.toolmen.bime.ntu.edu.tw
   SESSION_MAX_AGE: "28800"
-  SEMANTIC_SCHOLAR_LOOKUP: "true"
-  # 模型設定：照本機 .env 的非機密項目搬過來（LLM_PROVIDER、LLM_MODEL、LLM_MODEL_*、TARGET_LANG…，對照 .env.example）
+  # 模型（與本機 .env 實際生效的值相同；本機 vLLM 的 LLM_BASE_URL 不搬）
   LLM_PROVIDER: anthropic
+  LLM_MODEL: claude-opus-5-5
+  LLM_CONTEXT_TOKENS: "1000000"
+  LLM_EFFORT: medium
+  LLM_CONCURRENCY: "4"
+  DISABLE_THINKING: "true"
+  LLM_MODEL_EXPLAIN: anthropic:claude-sonnet-5-5
+  LLM_MODEL_TRANSLATE: anthropic:claude-sonnet-5-5
+  LLM_MODEL_HIGHLIGHT: anthropic:claude-sonnet-5-5
+  LLM_MODEL_CITE: anthropic:claude-sonnet-5-5
+  LLM_MODEL_OUTLINE: anthropic:claude-haiku-5-5
+  LLM_MODEL_SUGGEST: anthropic:claude-haiku-5-5
+  OCR_ENABLED: "true"
+  OCR_MODEL: anthropic:claude-sonnet-5-5
+  TARGET_LANG: 繁體中文（台灣用語）
+  SEMANTIC_SCHOLAR_LOOKUP: "true"

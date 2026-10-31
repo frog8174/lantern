@@ -22,12 +22,13 @@ docker push REGISTRY/lantern:0.1.0
 ```
 `deploy/k8s/kustomization.yaml` 的 `images.newName／newTag` 改成同一個。
 
-## 2. Keycloak 正式 client
-在 realm `Toolmen_application` 另建 client（例如 `lantern`，和本機的 `lantern-local` 分開）：
-- Client authentication ON、只勾 Standard flow、PKCE Method **S256**（正式環境要勾）
-- Valid redirect URIs：`https://LANTERN_HOST/api/auth/callback`
-- Valid post logout redirect URIs：`https://LANTERN_HOST/`
-- Web origins：`https://LANTERN_HOST`
+## 2. Keycloak client（沿用 `lantern-local`）
+在 client `lantern-local` 的設定**加上**正式網域（本機的那幾行保留）：
+- Valid redirect URIs：加 `https://lantern.toolmen.bime.ntu.edu.tw/api/auth/callback`
+- Valid post logout redirect URIs：加 `https://lantern.toolmen.bime.ntu.edu.tw/`
+- Web origins：加 `https://lantern.toolmen.bime.ntu.edu.tw`
+- 上線前建議把 Advanced 分頁的 PKCE Method 設成 **S256**（強制 PKCE；Lantern 本來就會帶）。
+- 正式和本機共用同一把 client secret：本機 `.env` 的 `OIDC_CLIENT_SECRET` 就是 Secret 要放的那一把。
 
 ## 3. Secret（不要 commit）
 ```bash
@@ -36,21 +37,21 @@ kubectl -n lantern create secret generic lantern-secrets \
   --from-literal=OIDC_CLIENT_SECRET='…' \
   --from-literal=SESSION_SECRET="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" \
   --from-literal=ANTHROPIC_API_KEY='…'
-  # 其他模型 key（LLM_API_KEY、VLM_API_KEY…）照 .env 需要的加
+  # 本機有設 SEMANTIC_SCHOLAR_API_KEY 的話也加上（沒有 key 時 Semantic Scholar 常被限流）
 ```
 
 ## 4. 設定與套用
-1. `deploy/k8s/configmap.yaml`：`PUBLIC_BASE_URL`、`OIDC_CLIENT_ID`，並把本機 `.env` 的**非機密**模型設定搬過來。
-2. `deploy/k8s/ingress.yaml`：`LANTERN_HOST`、`ingressClassName`（`kubectl get ingressclass` 查）、TLS 方式（cert-manager 或 Traefik certresolver，二選一打開）。
-3. `deploy/k8s/pvc.yaml`：需要時填 `storageClassName`。
+1. `deploy/k8s/configmap.yaml`：已填好（網域、client、與本機相同的模型設定）。
+2. `deploy/k8s/ingress.yaml`：已填好（Traefik、cert-manager-prod）；確認 `ingressClassName` 與 `kubectl get ingressclass` 一致。
+3. `deploy/k8s/pvc.yaml`：已填 `rook-ceph-hdd-block`。
 4. 套用：`kubectl apply -k deploy/k8s`
 5. 驗證：
    ```bash
    kubectl -n lantern rollout status deploy/lantern
    kubectl -n lantern logs deploy/lantern
-   curl https://LANTERN_HOST/api/livez        # {"ok": true}
+   curl https://lantern.toolmen.bime.ntu.edu.tw/api/livez        # {"ok": true}
    ```
-   然後瀏覽器開 `https://LANTERN_HOST` 登入一次。
+   然後瀏覽器開 `https://lantern.toolmen.bime.ntu.edu.tw` 登入一次。
 
 ## Traefik
 Ingress 這層不用額外設定：上傳大小預設無上限、SSE 預設即時轉送不緩衝、回應預設沒有寫入逾時。
@@ -69,9 +70,15 @@ Ingress 這層不用額外設定：上傳大小預設無上限、SSE 預設即�
 - **備份**：只要備份 PVC（`/data`）；SQLite 建議用 `sqlite3 /data/app.db ".backup …"` 或停機時複製。
 
 ## 待填
-- [ ] 映像倉庫（REGISTRY）
-- [ ] Lantern 公開網域（LANTERN_HOST）
-- [ ] IngressClass 名稱（Traefik，通常是 `traefik`）、TLS 方式（cert-manager 或 Traefik certresolver）
+- [ ] 映像倉庫（`kustomization.yaml` 的 `REGISTRY`）
+- [ ] Keycloak `lantern-local` 加上正式網域的 redirect URI（見第 2 步）
+- [ ] 確認 IngressClass 名稱是 `traefik`、ClusterIssuer 名稱是 `cert-manager-prod`
 - [ ] Traefik `websecure` 的 `readTimeout` 是否要拉長（大檔上傳）
-- [ ] StorageClass（若不是預設）
-- [ ] 正式 Keycloak client ID
+- [x] 網域 lantern.toolmen.bime.ntu.edu.tw、StorageClass rook-ceph-hdd-block、TLS cert-manager-prod
+
+## 本機驗證（2026-11-01）
+- `docker build -t lantern:0.1.0 .`：成功，映像約 757 MB。
+- 以 k8s 相同限制執行（唯讀根目錄、uid 10001、drop ALL、只有 /data 與 /tmp 可寫）：首頁、薛西弗斯素材、dev 登入、上傳並解析 22 頁 PDF、縮圖都正常；寫入 /app 被拒（唯讀生效）。
+- OIDC 正式設定 + `X-Forwarded-Proto: https`：登入導向的 redirect_uri 為 `https://lantern.toolmen.bime.ntu.edu.tw/api/auth/callback`，session cookie 帶 secure、httponly、samesite=lax。
+- `AUTH_MODE=oidc` 缺設定時拒絕啟動並說明缺哪些變數。
+- 唯讀根目錄時 /data 一定要掛 volume（k8s 的 PVC）；一般 `docker run` 不掛 volume 也能啟動。
