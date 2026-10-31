@@ -1486,6 +1486,11 @@ async function showWs(ws = curWs) {
   $$("#wsView .ws-only").forEach((b) => (b.hidden = !ws));
   $("#wsStatus").textContent = "";
   setWsTab(ws ? wsTab : "papers");
+  await renderWsCards(ws);
+}
+
+/** 只重畫論文卡片（背景翻譯輪詢也走這裡，不動分頁、Wiki、上傳狀態）。 */
+async function renderWsCards(ws) {
   const papers = wsPaperList = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
   const del = ws ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
   $("#wsPapers").innerHTML = papers.map((p) => `<div class="card" data-id="${escapeHTML(p.id)}">
@@ -1496,7 +1501,7 @@ async function showWs(ws = curWs) {
     || `<p class="cards-empty">${ws ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
   // 有論文還在背景翻譯：過幾秒再刷新，直到都跑完或離開這頁
   if (papers.some((p) => p.translating)) setTimeout(() => {
-    if (document.body.dataset.view === "ws" && curWs === ws) showWs(ws);
+    if (document.body.dataset.view === "ws" && curWs === ws) renderWsCards(ws);
   }, 4000);
 }
 
@@ -1567,6 +1572,7 @@ async function loadWiki() {
   if (curWs?.id !== ws.id) return;
   $("#wikiPending").textContent = w.pending ? `${w.pending} 篇論文待整理` : w.pages.length ? "所有論文都已整理" : "";
   $("#wikiUpdate").disabled = wikiBusy || !w.pending;
+  if (w.running && !wikiBusy) $("#wikiUpdate").onclick();  // 重新整理前已在跑：接回進度
   $("#wikiList").innerHTML = w.pages.map((p) => `<li><button class="witem${p.slug === "index" ? " home" : ""}" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</button></li>`).join("");
   if (!w.pages.length) {
     page.innerHTML = `<div class="wempty"><h3>這個 workspace 還沒有 Wiki</h3>

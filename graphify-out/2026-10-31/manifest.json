@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793444386.7842207,
-    "seen": 1793444438.2581902,
-    "ast_hash": "cc561d651e4d2c1dc89e1935986829dc",
+    "mtime": 1793444598.1839194,
+    "seen": 1793444616.452959,
+    "ast_hash": "12c5a5a61177ad6e1cb2f2c7d52ae842",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -121,9 +121,9 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793444011.4832716,
-    "seen": 1793444078.9831817,
-    "ast_hash": "16f3bd1fcc606ba6f259714e9403e86e",
+    "mtime": 1793444598.1839194,
+    "seen": 1793444616.452959,
+    "ast_hash": "92fd9d44803993967fea254fb45a5074",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {

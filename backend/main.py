@@ -692,13 +692,27 @@ def remove_from_workspace(wid: str, pid: str, uid: Uid):
 
 
 # ---------------- Workspace wiki（docs/wiki.md）----------------
-_wiki_running: set[str] = set()  # shortcut: in-process lock, breaks with multiple uvicorn workers
+# 正在跑的更新：wid → 已推出的進度（None = 結束）。更新是背景任務，不綁瀏覽器連線：
+# 重新整理或離開頁面不會中斷，再打開 Wiki 會接回同一個進度。
+_wiki_jobs: dict[str, list] = {}  # shortcut: in-process state, breaks with multiple uvicorn workers
+
+
+async def _wiki_job(wid: str) -> None:
+    steps = _wiki_jobs[wid]
+    try:
+        async for step in features.update_wiki(wid):
+            steps.append(step)
+    except Exception as e:  # 已整理好的論文已寫入 wiki_ingested，再按一次只做剩下的
+        steps.append({"error": f"{type(e).__name__}: {e}"})
+    finally:
+        steps.append(None)
+        _wiki_jobs.pop(wid, None)
 
 
 @app.get("/api/workspaces/{wid}/wiki")
 def wiki(wid: str, uid: Uid):
     _ws_or_404(wid, uid)
-    return {"pages": db.wiki_pages(wid), "pending": len(db.wiki_pending(wid))}
+    return {"pages": db.wiki_pages(wid), "pending": len(db.wiki_pending(wid)), "running": wid in _wiki_jobs}
 
 
 @app.get("/api/workspaces/{wid}/wiki/{slug}")
@@ -712,19 +726,28 @@ def wiki_page(wid: str, slug: str, uid: Uid):
 
 @app.post("/api/workspaces/{wid}/wiki/update")
 async def wiki_update(wid: str, uid: Uid):
+    """開始更新；已經在跑就接上同一個進度（不會跑第二份）。"""
     _ws_or_404(wid, uid)
-    if wid in _wiki_running:
-        raise HTTPException(409, "wiki update already running")
-    _wiki_running.add(wid)
+    if wid not in _wiki_jobs:
+        _wiki_jobs[wid] = []
+        task = asyncio.create_task(_wiki_job(wid))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+    steps = _wiki_jobs[wid]
 
-    async def run() -> AsyncIterator[str]:
-        try:
-            async for step in features.update_wiki(wid):
-                yield json.dumps(step, ensure_ascii=False)
-        finally:
-            _wiki_running.discard(wid)
+    async def follow() -> AsyncIterator[str]:
+        i = 0
+        while True:
+            while i >= len(steps):
+                await asyncio.sleep(0.3)
+            step, i = steps[i], i + 1
+            if step is None:
+                return
+            if "error" in step:
+                raise RuntimeError(step["error"])
+            yield json.dumps(step, ensure_ascii=False)
 
-    return sse(run())
+    return sse(follow())
 
 
 @app.get("/api/health")

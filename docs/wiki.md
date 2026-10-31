@@ -42,7 +42,9 @@ wiki_ingested (workspace_id, paper_id, ingested REAL, PRIMARY KEY (workspace_id,
 | GET | `/api/workspaces/{wid}/wiki` | `{pages: [{slug, title, updated}], pending: <未整理論文數>}`，index 排第一 |
 | GET | `/api/workspaces/{wid}/wiki/{slug}` | `{slug, title, markdown, sources, updated}`；不存在 404 |
 | POST | `/api/workspaces/{wid}/wiki/update` | SSE（沿用 `sse()`）。每則 `{"t": JSON 字串}`，內容 `{"msg": "...", "done": n, "total": m}`；結束 `[DONE]`；錯誤照 `sse()` 的 `{"error"}` |
-- 都要登入且 workspace 屬於自己（`_ws_or_404`）。同一 workspace 同時只能跑一個 update，第二個回 409。
+- 都要登入且 workspace 屬於自己（`_ws_or_404`）。
+- 更新是伺服器背景任務，不綁瀏覽器連線：重新整理、離開頁面都不會中斷。GET 清單多回 `running`；
+  已在跑時再 POST 不會另跑一份，而是接上同一個進度串流（前端打開 Wiki 看到 `running` 就自動接回）。
 
 ## 前端
 - workspace 頁標題下加分頁切換：「論文」｜「Wiki」。

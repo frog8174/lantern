@@ -14,7 +14,7 @@ def test_wiki_update(client, bob, pdfs, monkeypatch):
     with open(pdfs["numeric"], "rb") as f:
         pid = client.post("/api/papers", files={"file": ("w.pdf", f, "application/pdf")},
                           data={"workspace": w["id"]}).json()["id"]
-    assert client.get(base).json() == {"pages": [], "pending": 1}
+    assert client.get(base).json() == {"pages": [], "pending": 1, "running": False}
 
     _, events, err = sse(client, "POST", base + "/update")
     assert err is None
@@ -34,11 +34,14 @@ def test_wiki_update(client, bob, pdfs, monkeypatch):
     assert [json.loads(e)["total"] for e in events] == [0]
     assert [p["updated"] for p in client.get(base).json()["pages"]] == [p["updated"] for p in r["pages"]]
 
-    main._wiki_running.add(w["id"])  # 同一 workspace 正在更新 → 409
+    assert client.get(base).json()["running"] is False
+    steps = main._wiki_jobs[w["id"]] = [{"msg": "x", "done": 0, "total": 1}, None]  # 假裝正在跑
     try:
-        assert client.post(base + "/update").status_code == 409
+        assert client.get(base).json()["running"] is True
+        _, events, _ = sse(client, "POST", base + "/update")  # 接上同一個進度，不另跑一份
+        assert [json.loads(e)["msg"] for e in events] == ["x"] and main._wiki_jobs[w["id"]] is steps
     finally:
-        main._wiki_running.discard(w["id"])
+        main._wiki_jobs.pop(w["id"], None)
 
     for path in (base, f"{base}/index"):
         assert bob.get(path).status_code == 404

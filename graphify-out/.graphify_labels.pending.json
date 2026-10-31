@@ -11,14 +11,13 @@
   "15": "conftest.py",
   "16": "Workspace LLM Wiki（MVP）",
   "17": "escapeHTML",
-  "18": "s2_paper_id",
+  "18": "test_anthropic.py",
   "19": "drawHighlights",
-  "20": "complete_json",
+  "20": "config.py",
   "21": "aiCard",
-  "22": "streamInto",
+  "22": "escapeHTML",
   "23": "pumpTranslation",
-  "24": "local_context",
-  "25": "_to_claude",
-  "26": "drawOutline",
-  "27": "Lantern AI Paper Reader"
+  "24": "test_workspaces.py",
+  "25": "addMsg",
+  "26": "drawOutline"
 }
