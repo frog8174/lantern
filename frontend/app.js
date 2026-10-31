@@ -1719,7 +1719,9 @@ async function showWikiPage(slug) {
   $$("#wikiList .witem").forEach((b) => (b.dataset.slug === slug ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
   page.innerHTML = `<h1 class="wtitle" tabindex="-1">${escapeHTML(p.title)}</h1><div class="wbody"></div>
     <p class="wmeta">更新於 ${fmtDate(p.updated)}${p.sources?.length ? `，整理自 ${p.sources.length} 篇論文` : ""}</p>`;
-  renderWiki($(".wbody", page), p.markdown || "");
+  // 模型常把標題再寫一次成 # 標題：頁首已經有了，同名就拿掉
+  const md = (p.markdown || "").replace(/^\s*#\s+(.+)\n/, (m, t) => (t.trim() === p.title.trim() ? "" : m));
+  renderWiki($(".wbody", page), md);
 }
 
 function focusWikiTitle() {

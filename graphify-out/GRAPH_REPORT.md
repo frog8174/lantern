@@ -1,9 +1,9 @@
-# Graph Report - agent-ae88a38ba78ae0428  (2026-10-31)
+# Graph Report - paper-reader  (2026-10-31)
 
 ## Corpus Check
-- 29 files · ~31,176 words
+- 29 files · ~31,194 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 6 file(s) not represented in the graph (top: (none) 3, .example 1, .css 1)
+- Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
 ## Summary
 - 701 nodes · 1754 edges · 25 communities (21 shown, 4 thin omitted)
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `53991e64`
+- Built from commit: `2a464481`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -161,7 +161,7 @@ Cohesion: 0.40
 Nodes (6): cardPaper(), fmtDate(), openNote(), paintWsCards(), patchPaper(), trRing()
 
 ## Knowledge Gaps
-- **13 isolated node(s):** `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules`, `ParsedPaper structure`, `vLLM (Qwen3.5-9B)` (+8 more)
+- **13 isolated node(s):** `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules`, `/api/health endpoint`, `BM25 retrieval` (+8 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 205 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
