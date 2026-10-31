@@ -558,7 +558,7 @@ a.wref:hover { text-decoration-style: solid; }
 }
 
 /* ---- Wiki 問答：問題排成條目標題（朱褐邊線），回答是一張和 Wiki 頁同款的羊皮紙，引用籤條、站內連結都一樣 ---- */
-.ask { max-width: 50em; margin-top: 22px; }
+.ask { margin-top: 22px; }
 .ahead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .ahead p { margin: 0; font-style: italic; }
 .ahead button { min-height: var(--tap); }
