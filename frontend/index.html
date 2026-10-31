@@ -91,9 +91,9 @@
       <button id="wsDelete" class="tool ws-only">刪除 workspace</button>
     </div>
   </div>
-  <!-- 「論文｜Wiki」分頁；全部論文沒有 wiki，ws-only 會把它藏起來 -->
+  <!-- 「論文｜Wiki｜問答」分頁；全部論文沒有 wiki，ws-only 會把它藏起來 -->
   <div id="wsTabs" class="wtabs ws-only" role="group" aria-label="檢視">
-    <button data-tab="papers" aria-pressed="true">論文</button><button data-tab="wiki" aria-pressed="false">Wiki</button>
+    <button data-tab="papers" aria-pressed="true">論文</button><button data-tab="wiki" aria-pressed="false">Wiki</button><button data-tab="ask" aria-pressed="false">問答</button>
   </div>
   <div id="wsStatus" class="muted small"></div>
   <div id="wsPapers" class="cards papers"></div>
@@ -105,6 +105,15 @@
       <ul id="wikiList" class="wlist"></ul>
     </nav>
     <article id="wikiPage" class="wpage"></article>
+  </div>
+  <!-- Wiki 問答：先查這個 workspace 的 Wiki 再回答 -->
+  <div id="wsAsk" class="ask" hidden>
+    <div class="ahead"><p class="muted">回答會先查這個 workspace 的 Wiki，每個說法都標著出處。</p><button id="askClear" class="link small">清空對話</button></div>
+    <div id="askOut"></div>
+    <form id="askForm" class="chatbox askbox">
+      <textarea id="askInput" rows="2" aria-label="問這個 workspace 的 Wiki" placeholder="問一個跨論文的問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+      <button class="icon send" title="送出" aria-label="送出"><svg><use href="#i-send"/></svg></button>
+    </form>
   </div>
 </div></section>
 
@@ -119,6 +128,8 @@
   <div class="row"><b>設定</b><button class="icon" id="setClose" title="關閉"><svg><use href="#i-close"/></svg></button></div>
   <label class="setting"><input type="checkbox" id="setAutoTranslate">
     <span>上傳後先在背景把整篇對照翻譯跑完<br><span class="muted small">打開論文時譯文已經備好；每篇論文會多花一次整篇翻譯的 token。</span></span></label>
+  <label class="setting"><input type="checkbox" id="setAutoWiki">
+    <span>論文加入 workspace 就自動更新 Wiki<br><span class="muted small">不必再到 Wiki 分頁按「更新 Wiki」；每加一篇會多花一次整理 Wiki 的 token。</span></span></label>
 </dialog>
 
 <main>
@@ -179,6 +190,7 @@
         <div id="paperInfo" class="info"><p class="muted">開啟論文後，這裡會顯示論文資訊。</p></div>
         <div class="row"><h4>AI 摘要</h4><div><button id="btnSummary" class="small">產生摘要</button><button id="btnSummaryRe" class="link small">重新產生</button></div></div>
         <div id="summaryOut" class="md"></div>
+        <section id="paperWiki" class="pwiki" hidden><h4>在 Wiki 中</h4><ul id="paperWikiList" class="wblist"></ul></section>
       </div>
     </div>
 

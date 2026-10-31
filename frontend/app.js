@@ -247,6 +247,7 @@ async function openPaper(id) {
   renderInfo();
   renderActivity();
   $("#summaryOut").innerHTML = "";
+  loadPaperWiki(id);
   $("#relatedList").innerHTML = '<li class="muted small">按上方按鈕取得推薦（資料來自 Semantic Scholar）。</li>';
   closeAiCard();
   chatLoaded = false;
@@ -1328,6 +1329,24 @@ async function runSummary(refresh) {
 $("#btnSummary").onclick = () => runSummary(false);
 $("#btnSummaryRe").onclick = () => runSummary(true);
 
+/* 「在 Wiki 中」：哪些 workspace 的 Wiki 頁引用了這篇（沒有就整段不顯示） */
+async function loadPaperWiki(pid) {
+  $("#paperWiki").hidden = true;
+  const links = await api(`/api/papers/${pid}/wiki`).catch(() => []);
+  if (S.paper?.id !== pid || !links.length) return;
+  $("#paperWikiList").innerHTML = links.map((l) => `<li><button class="wbitem" data-ws="${escapeHTML(l.workspace_id)}" data-slug="${escapeHTML(l.slug)}">
+    ${escapeHTML(l.title)}<span class="small muted">${escapeHTML(l.workspace_name)}</span></button></li>`).join("");
+  $("#paperWiki").hidden = false;
+}
+$("#paperWikiList").onclick = async (e) => {
+  const b = e.target.closest("button[data-ws]");
+  if (!b) return;
+  const ws = (await api("/api/workspaces")).find((w) => w.id === b.dataset.ws);
+  if (!ws) return;
+  await showWs(ws);
+  openWikiPage(b.dataset.slug);
+};
+
 /* ---------------- 相關論文推薦 ---------------- */
 async function loadRelated(url) {
   const ul = $("#relatedList");
@@ -1530,7 +1549,9 @@ function setWsTab(t) {
   $$("#wsTabs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === t));
   $("#wsPapers").hidden = t !== "papers";
   $("#wsWiki").hidden = t !== "wiki";
-  if (t === "wiki") loadWiki();
+  $("#wsAsk").hidden = t !== "ask";
+  if (t === "ask") loadAsk();
+  if (t === "wiki") return loadWiki();
 }
 $("#wsTabs").onclick = (e) => {
   const b = e.target.closest("button[data-tab]");
@@ -1601,24 +1622,148 @@ async function showWikiPage(slug) {
   renderWiki($(".wbody", page), p.markdown || "");
 }
 
-$("#wsWiki").onclick = async (e) => {
-  const l = e.target.closest("[data-slug]");
-  if (l) {
-    e.preventDefault();
-    await showWikiPage(l.dataset.slug);
-    const h = $("#wikiPage .wtitle");
-    if (h) { h.focus({ preventScroll: true }); if (h.getBoundingClientRect().top < 60) h.scrollIntoView({ block: "start" }); }
-    return;
-  }
-  const c = e.target.closest(".wcite");
-  if (!c) return;
+function focusWikiTitle() {
+  const h = $("#wikiPage .wtitle");
+  if (h) { h.focus({ preventScroll: true }); if (h.getBoundingClientRect().top < 60) h.scrollIntoView({ block: "start" }); }
+}
+/** 從 Wiki 以外的地方（問答、閱讀頁）跳到目前 workspace 的某一頁 Wiki。 */
+async function openWikiPage(slug) {
+  wikiSlug = slug;
+  await setWsTab("wiki");
+  focusWikiTitle();
+}
+/** Wiki 頁與問答共用：點引用標記就開論文跳到那一頁。 */
+async function openCite(c) {
   try {
     await openPaper(c.dataset.pid);
     setTimeout(() => goToPage(+c.dataset.page - 1), 300);  // 同搜尋結果：等頁面排好再跳
   } catch (err) {
     showWs();
-    $("#wikiProg").innerHTML = `<span class="err">開不了這篇論文：${escapeHTML(err.message)}（可能已經被刪除）</span>`;
+    $("#wsStatus").innerHTML = `<span class="err">開不了這篇論文：${escapeHTML(err.message)}（可能已經被刪除）</span>`;
   }
+}
+$("#wsWiki").onclick = async (e) => {
+  const l = e.target.closest("[data-slug]");
+  if (l) {
+    e.preventDefault();
+    await showWikiPage(l.dataset.slug);
+    focusWikiTitle();
+    return;
+  }
+  const c = e.target.closest(".wcite");
+  if (c) openCite(c);
+};
+
+/* ---------------- Wiki 問答（docs/wiki.md 第二階段） ---------------- */
+let askBusy = false;
+
+async function loadAsk() {
+  const ws = curWs, out = $("#askOut");
+  let msgs, w;
+  try {
+    [msgs, w] = await Promise.all([api(`/api/workspaces/${ws.id}/ask`), api(`/api/workspaces/${ws.id}/wiki`)]);
+  } catch (e) {
+    out.innerHTML = `<p class="cards-empty err">讀不到問答紀錄：${escapeHTML(e.message)}</p>`;
+    return;
+  }
+  if (curWs?.id !== ws.id) return;
+  out.innerHTML = "";
+  let q = "";
+  for (const m of msgs) {
+    if (m.role === "user") q = m.content;
+    addAsk(m.role, m.content, q);
+  }
+  const empty = !w.pages.length;
+  $("#askInput").disabled = $("#askForm button").disabled = empty;
+  $("#askClear").hidden = !msgs.length;
+  if (empty) out.insertAdjacentHTML("beforeend", `<div class="wempty qempty"><h3>先有 Wiki，才能問</h3>
+    <p>問答會先查這個 workspace 的 Wiki 再回答。現在還沒有任何 Wiki 頁：到 Wiki 分頁按「更新 Wiki」，整理好就能回來問。</p>
+    <button class="tool" data-go="wiki">到 Wiki 分頁</button></div>`);
+}
+
+/** 一則問答：問題排成條目標題，回答是一張羊皮紙；q 是回答前那個問題（存成 Wiki 頁要一起送）。 */
+function addAsk(role, text, q) {
+  const d = document.createElement("div");
+  d.className = `qa ${role}`;
+  if (role === "user") d.textContent = text;
+  else {
+    d.innerHTML = '<div class="wbody qbody" aria-live="polite"></div>';
+    renderWiki(d.firstChild, text);
+    if (text) addSave(d, q, text);
+  }
+  $("#askOut").appendChild(d);
+  return d;
+}
+
+function addSave(d, question, answer) {
+  const f = document.createElement("div");
+  f.className = "qsave";
+  f.innerHTML = '<button class="qsavebtn">存成 Wiki 頁</button><span class="qstat" role="status"></span>';
+  const b = f.firstChild, st = f.lastChild, ws = curWs;
+  b.onclick = async () => {
+    b.disabled = true;
+    st.textContent = "整理成 Wiki 頁中…";
+    try {
+      const p = await api(`/api/workspaces/${ws.id}/ask/save`, { method: "POST", body: { question, answer } });
+      b.remove();
+      st.innerHTML = `已存成 Wiki 頁<a class="wref" href="#" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</a>`;
+      $("a", st).focus();
+    } catch (e) {
+      b.disabled = false;
+      st.innerHTML = `<span class="err">沒有存成：${escapeHTML(e.message)}</span>`;
+    }
+  };
+  d.appendChild(f);
+}
+
+async function sendAsk(q) {
+  const ws = curWs;
+  askBusy = true;
+  $("#askClear").hidden = false;
+  addAsk("user", q).scrollIntoView({ block: "start", behavior: "smooth" });
+  const d = addAsk("assistant", ""), body = d.firstChild;
+  body.classList.add("cursor");
+  body.setAttribute("aria-busy", "true");  // 串完才念出整段，不要一個字一個字報
+  try {
+    const full = await stream(`/api/workspaces/${ws.id}/ask`, { body: { question: q } }, (t) => renderWiki(body, t));
+    renderWiki(body, full);
+    addSave(d, q, full);
+  } catch (e) {
+    body.innerHTML = `<span class="err">${escapeHTML(e.message)}</span>`;
+  } finally {
+    body.classList.remove("cursor");
+    body.removeAttribute("aria-busy");
+    askBusy = false;
+  }
+}
+$("#askForm").onsubmit = (e) => {
+  e.preventDefault();
+  const q = $("#askInput").value.trim();
+  if (!q || askBusy) return;
+  $("#askInput").value = "";
+  sendAsk(q);
+};
+$("#askInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#askForm").requestSubmit(); }
+});
+// 不用 confirm()：第一下只是「上膛」，三秒內再按一次才真的清空
+$("#askClear").onclick = async (e) => {
+  const b = e.currentTarget;
+  if (!b.dataset.armed) {
+    b.dataset.armed = "1";
+    b.textContent = "再按一次清空";
+    setTimeout(() => { delete b.dataset.armed; b.textContent = "清空對話"; }, 3000);
+    return;
+  }
+  await api(`/api/workspaces/${curWs.id}/ask`, { method: "DELETE" });
+  loadAsk();
+};
+$("#wsAsk").onclick = (e) => {
+  if (e.target.closest("[data-go]")) return setWsTab("wiki");
+  const l = e.target.closest("a[data-slug]");
+  if (l) { e.preventDefault(); return openWikiPage(l.dataset.slug); }
+  const c = e.target.closest(".wcite");
+  if (c) openCite(c);
 };
 
 $("#wikiUpdate").onclick = async () => {
@@ -1683,12 +1828,14 @@ $("#wsDelete").onclick = async () => {
 };
 $("#wsBack").onclick = showHome;
 $("#btnHome").onclick = showHome;
+const showSettings = (s) => { $("#setAutoTranslate").checked = s.auto_translate; $("#setAutoWiki").checked = !!s.auto_wiki; };
 $("#btnSettings").onclick = async () => {
-  $("#setAutoTranslate").checked = (await api("/api/me/settings")).auto_translate;
+  showSettings(await api("/api/me/settings"));
   $("#setDlg").showModal();
 };
-$("#setAutoTranslate").onchange = async (e) => {
-  e.target.checked = (await api("/api/me/settings", { method: "PUT", body: { auto_translate: e.target.checked } })).auto_translate;
+$("#setAutoTranslate").onchange = $("#setAutoWiki").onchange = async () => {
+  showSettings(await api("/api/me/settings", { method: "PUT",
+    body: { auto_translate: $("#setAutoTranslate").checked, auto_wiki: $("#setAutoWiki").checked } }));
 };
 $("#setClose").onclick = () => $("#setDlg").close();
 $("#btnLogout").onclick = async () => {

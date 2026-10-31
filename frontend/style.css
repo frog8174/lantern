@@ -556,3 +556,38 @@ a.wref:hover { text-decoration-style: solid; }
   .wnav { position: static; }
   .wlist { max-height: 40vh; overflow-y: auto; }
 }
+
+/* ---- Wiki 問答：問題排成條目標題（朱褐邊線），回答是一張和 Wiki 頁同款的羊皮紙，引用籤條、站內連結都一樣 ---- */
+.ask { max-width: 50em; margin-top: 22px; }
+.ahead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.ahead p { margin: 0; font-style: italic; }
+.ahead button { min-height: var(--tap); }
+.qa.user { margin: 34px 0 12px; padding: 2px 0 2px 14px; border-left: 2px solid var(--oxblood); white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: clamp(20px, 2.6vw, 24px); line-height: 1.3; }
+.qa.assistant { background: var(--vellum); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-page);
+  padding: clamp(16px, 3.5vw, 32px) clamp(16px, 4vw, 40px) 10px; min-width: 0; }
+.qbody { max-width: none; }
+.qbody > p:first-child { font-size: inherit; }
+/* 「存成 Wiki 頁」：頁尾一道細線下的金色菱形，像在書頁邊角蓋一枚收藏章 */
+.qsave { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--rule); }
+.qsavebtn { display: inline-flex; align-items: center; gap: 9px; min-height: var(--tap); padding: 0 2px; border: none; background: none; border-radius: 0;
+  font-family: var(--font-display); font-style: italic; font-size: 17px; color: var(--accent); }
+.qsavebtn::before { content: ""; width: 7px; height: 7px; flex: none; background: var(--gilt); transform: rotate(45deg); transition: transform .2s; }
+.qsavebtn:hover { background: none; color: var(--ink); }
+.qsavebtn:hover::before { transform: rotate(135deg); }
+.qstat { font-style: italic; color: var(--ink-2); }
+.qstat:empty { display: none; }
+.qstat a.wref { margin-left: .5em; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+.qempty { margin-top: 30px; }
+.askbox { position: sticky; bottom: 0; margin-top: 28px; padding: 12px 0 6px; background: var(--paper); border-top: 1px solid var(--rule-strong); }
+.askbox textarea { background: var(--vellum); min-height: var(--tap); font-size: 15px; }
+.askbox .send { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .qsavebtn::before { transition: none; } }
+
+/* 閱讀頁「在 Wiki 中」：摘要底下的反向連結 */
+.pwiki { border-top: 1px solid var(--rule); margin-top: 18px; }
+.wblist { list-style: none; margin: 0; padding: 0; }
+.wbitem { all: unset; box-sizing: border-box; display: flex; flex-direction: column; width: 100%; min-height: var(--tap); padding: 6px 10px;
+  cursor: pointer; color: var(--accent); border-left: 2px solid transparent; line-height: 1.45; overflow-wrap: anywhere; }
+.wbitem:hover { background: var(--leaf); border-left-color: var(--oxblood); }
+.wbitem:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
