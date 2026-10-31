@@ -13,8 +13,13 @@
   "17": "escapeHTML",
   "18": "多使用者論文庫 + Workspace（測試登入版）",
   "19": "drawHighlights",
+  "20": "_to_claude",
   "21": "aiCard",
   "22": "streamInto",
   "23": "pumpTranslation",
-  "26": "drawOutline"
+  "24": "check",
+  "25": "_ThinkStripper",
+  "26": "drawOutline",
+  "27": "renderWsCards",
+  "28": "_stream"
 }

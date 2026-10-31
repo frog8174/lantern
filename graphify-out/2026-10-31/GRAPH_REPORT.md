@@ -1,7 +1,7 @@
 # Graph Report - paper-reader  (2026-10-31)
 
 ## Corpus Check
-- 24 files · ~28,057 words
+- 24 files · ~28,061 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `28ec05cb`
+- Built from commit: `28125d04`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
