@@ -1,11 +1,16 @@
 {
   "3": "db.py",
-  "4": "features.py",
+  "4": "pdf_parse.py",
   "6": "features.py",
   "7": "retrieval.py",
   "8": "fake_api.py",
   "13": "Lantern — 個人用 AI 論文閱讀器",
   "14": "CLAUDE.md",
   "15": "conftest.py",
-  "16": "Workspace LLM Wiki（MVP）"
+  "16": "Workspace LLM Wiki（MVP）",
+  "17": "test_units.py",
+  "18": "s2_paper_id",
+  "19": "功能對照",
+  "20": "complete_json",
+  "21": "auto_highlight"
 }

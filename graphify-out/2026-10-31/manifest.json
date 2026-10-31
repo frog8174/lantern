@@ -19,9 +19,9 @@
     "semantic_hash": ""
   },
   "backend/db.py": {
-    "mtime": 1793443952.6505053,
-    "seen": 1793444078.9831817,
-    "ast_hash": "1ebb4363ad5e7d1ae7e93d90639dca62",
+    "mtime": 1793444363.551431,
+    "seen": 1793444438.2581902,
+    "ast_hash": "5fe32832eb897e5efbf4acaaf84173af",
     "semantic_hash": ""
   },
   "backend/features.py": {
@@ -37,9 +37,9 @@
     "semantic_hash": "774ed0b4dedc074e55f5bbb476de099e"
   },
   "backend/main.py": {
-    "mtime": 1793443968.3952467,
-    "seen": 1793444078.9831817,
-    "ast_hash": "721c999cf816c4fb11e9a3d7e42ec607",
+    "mtime": 1793444364.2834737,
+    "seen": 1793444438.2581902,
+    "ast_hash": "a4e84a9e59a613cfabf535998b86b039",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793444011.8892336,
-    "seen": 1793444078.9831817,
-    "ast_hash": "c20ca7930f1c344a41fae46827bfc6d4",
+    "mtime": 1793444386.7842207,
+    "seen": 1793444438.2581902,
+    "ast_hash": "cc561d651e4d2c1dc89e1935986829dc",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -127,15 +127,21 @@
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
-    "mtime": 1793443983.6706347,
-    "seen": 1793444078.9831817,
-    "ast_hash": "522eb7f20964d6c97b896bb101dd504a",
+    "mtime": 1793444394.3169675,
+    "seen": 1793444438.2581902,
+    "ast_hash": "de7c734d207995426d098b1e5458e73d",
     "semantic_hash": ""
   },
   "docs/workspaces.md": {
     "mtime": 1793441447.256621,
     "seen": 1793442298.0332043,
     "ast_hash": "b24cec5070c2601d638376601d253a66",
+    "semantic_hash": ""
+  },
+  "docs/wiki.md": {
+    "mtime": 1793444320.6925342,
+    "seen": 1793444438.2581902,
+    "ast_hash": "9b51923735495bdd7af0e8889f51b89a",
     "semantic_hash": ""
   }
 }
