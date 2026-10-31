@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lantern 論文閱讀器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 標題 Cormorant Garamond、英文內文 Libre Baskerville、中文 Noto Serif TC（思源宋體） -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Noto+Serif+TC:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 圖示：一律 inline SVG，用 currentColor 跟著主題變色 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-explain" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="11" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m13.8 13.8 2.6 2.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="m14.5 5.5 4 4L9 19H5v-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 21h16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.6 5.2 3.6 8.5s-1 6.1-3.6 8.5c-2.6-2.4-3.6-5.2-3.6-8.5s1-6.1 3.6-8.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 5H6a1 1 0 0 0-1 1v10" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-5 16-3-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M12 4c4.4 0 8 3 8 6.8s-3.6 6.8-8 6.8c-.9 0-1.8-.1-2.6-.4L5 19l1.2-3.6C4.8 14.2 4 12.6 4 10.8 4 7 7.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m4 11 8-6.5 8 6.5M6 9.5V19h12V9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M10 7H6a1 1 0 0 0-1 1v4h4v1c0 1.5-1 2.5-3 3M19 7h-4a1 1 0 0 0-1 1v4h4v1c0 1.5-1 2.5-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24"><path d="M7 3v14h14M3 7h14v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 5v14" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-popout" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 4h9v9M20 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="top">
+  <button id="toggleLib" class="icon" title="論文庫 / 大綱">☰</button>
+  <div class="brand">Lantern</div>
+  <div id="paperTitle" class="title"></div>
+  <div class="tools">
+    <div class="group">
+      <button id="btnZoomOut" class="icon" title="縮小">−</button>
+      <span id="zoomLabel">120%</span>
+      <button id="btnZoomIn" class="icon" title="放大">＋</button>
+    </div>
+    <div class="group pagenav">
+      <input id="pageInput" inputmode="numeric" aria-label="目前頁碼" value="1"><span id="pageTotal">/ 0</span>
+    </div>
+    <button id="btnCrop" class="tool" title="框選圖表或公式請 AI 解釋（也可以按住 Ctrl / ⌘ 直接拖曳）"><svg><use href="#i-crop"/></svg>框選</button>
+    <button id="btnHighlight" class="tool" title="自動標註新穎性 / 方法 / 結果"><svg><use href="#i-spark"/></svg>自動標註</button>
+    <div class="seg" id="trMode" role="group" aria-label="翻譯模式" title="保留版面翻譯">
+      <button data-mode="off" class="on">原文</button>
+      <button data-mode="overlay" title="譯文疊在原文位置，滑過看原文">疊加</button>
+      <button data-mode="side" title="原文頁｜譯文頁 並排，圖表保留">並排</button>
+    </div>
+    <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
+  </div>
+</header>
+
+<main>
+  <aside id="lib" class="lib">
+    <section>
+      <h3>匯入論文</h3>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="application/pdf" hidden>
+        拖曳 PDF 到這裡，或點擊選檔
+      </label>
+      <form id="arxivForm" class="arxiv">
+        <input id="arxivInput" placeholder="arXiv 編號或 PDF 網址" title="arXiv 編號 / 網址，或任何直接下載 PDF 的網址（學校網路下的期刊 PDF 也可以）">
+        <button>匯入</button>
+      </form>
+      <div id="ingestStatus" class="muted small"></div>
+    </section>
+    <section>
+      <h3>論文庫</h3>
+      <input id="libSearch" class="libsearch" placeholder="篩選標題、標籤；Enter = 全文搜尋">
+      <div id="tagBar" class="tagbar"></div>
+      <ul id="paperList" class="list"></ul>
+      <div id="searchOut" hidden>
+        <h3>全文搜尋結果 <button id="searchClose" class="link small">關閉</button></h3>
+        <ul id="searchList" class="list hits"></ul>
+      </div>
+    </section>
+    <section>
+      <h3>大綱 <button id="btnAiOutline" class="link small" title="PDF 沒有目錄時用 AI 生成">AI 生成</button></h3>
+      <ul id="outline" class="list outline"></ul>
+    </section>
+  </aside>
+
+  <section id="viewer" class="viewer">
+    <div id="empty" class="empty">
+      <div class="moon"></div>
+      <p>從左邊匯入一篇論文開始閱讀。</p>
+      <p class="muted small">選取文字 → 解釋 / 螢光筆 / 翻譯 / 提問　·　點 [12] 看引用　·　Ctrl/⌘＋拖曳 框選圖表　·　右鍵 加註解</p>
+    </div>
+    <div id="pages"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="pgrip" id="panelGrip" title="拖曳調整寬度" role="separator" aria-orientation="vertical"></div>
+    <div class="phead"><b>活動面板</b>
+      <button id="panelDock" class="link small" title="放回右側">停靠</button></div>
+    <nav class="tabs" role="tablist">
+      <button data-tab="home" class="on" title="總覽與摘要"><svg><use href="#i-home"/></svg><span>摘要</span></button>
+      <button data-tab="notes" title="螢光筆與自動標註"><svg><use href="#i-pen"/></svg><span>標註</span></button>
+      <button data-tab="explain" title="解釋紀錄"><svg><use href="#i-explain"/></svg><span>解釋</span></button>
+      <button data-tab="comments" title="註解"><svg><use href="#i-comment"/></svg><span>註解</span></button>
+      <button data-tab="refs" title="參考文獻"><svg><use href="#i-quote"/></svg><span>引用</span></button>
+      <button data-tab="related" title="相關論文"><svg><use href="#i-link"/></svg><span>相關</span></button>
+      <button id="panelFloat" class="pfloat" title="彈出成浮動視窗（可拖曳、可調整大小）"><svg><use href="#i-popout"/></svg><span>彈出</span></button>
+    </nav>
+
+    <div class="tab on" id="tab-home">
+      <div class="feed">
+        <div id="paperInfo" class="info"><p class="muted">開啟論文後，這裡會顯示論文資訊。</p></div>
+        <div class="row"><h4>AI 摘要</h4><div><button id="btnSummary" class="small">產生摘要</button><button id="btnSummaryRe" class="link small">重新產生</button></div></div>
+        <div id="summaryOut" class="md"></div>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-notes">
+      <div class="filters">
+        <div class="frow"><span class="small muted">顏色</span><span id="colorFilter" class="swatches"></span></div>
+        <div class="frow">
+          <label><input type="checkbox" id="showAuto" checked> 自動標註</label>
+          <label><input type="checkbox" id="showLabels" checked> 顯示標籤</label>
+        </div>
+        <div class="frow" id="autoFilter"></div>
+        <input id="noteSearch" placeholder="搜尋標註…">
+      </div>
+      <ul id="notesList" class="notes"></ul>
+    </div>
+
+    <div class="tab" id="tab-explain"><ul id="explainList" class="notes"></ul></div>
+    <div class="tab" id="tab-comments"><ul id="commentList" class="notes"></ul></div>
+
+    <div class="tab" id="tab-refs">
+      <div class="filters"><input id="refSearch" placeholder="搜尋參考文獻…"></div>
+      <ul id="refList" class="notes refs"></ul>
+    </div>
+
+    <div class="tab" id="tab-related">
+      <div class="row pad">
+        <button id="btnRelated" title="Semantic Scholar 依這篇推薦">與本篇相關</button>
+        <button id="btnRecLib" title="以論文庫所有論文為依據推薦">依我的論文庫推薦</button>
+      </div>
+      <ul id="relatedList" class="related"><li class="muted small">按上方按鈕取得推薦（資料來自 Semantic Scholar）。</li></ul>
+    </div>
+  </aside>
+</main>
+
+<!-- 選字後浮出的工具列 -->
+<div id="selBar" class="pill" hidden>
+  <button data-act="explain" title="解釋（E）"><svg><use href="#i-explain"/></svg></button>
+  <span class="hlwrap">
+    <button data-act="highlight" title="螢光筆（H）"><svg><use href="#i-pen"/></svg></button>
+    <span class="palette" id="palette"></span>
+  </span>
+  <button data-act="translate" title="翻譯（T）"><svg><use href="#i-globe"/></svg></button>
+  <button data-act="comment" title="加註解（C）"><svg><use href="#i-comment"/></svg></button>
+  <input id="askInput" placeholder="Ask AI …" aria-label="針對選取段落提問">
+</div>
+
+<!-- 框選區域後浮出的工具列 -->
+<div id="cropBar" class="pill" hidden>
+  <button data-act="explain" title="解釋這個區域"><svg><use href="#i-explain"/></svg></button>
+  <input id="cropAsk" placeholder="問這張圖 …" aria-label="針對框選區域提問">
+  <button data-act="close" title="取消"><svg><use href="#i-close"/></svg></button>
+</div>
+
+<!-- 右鍵選單 -->
+<div id="ctxMenu" class="menu" hidden>
+  <button data-act="comment"><svg><use href="#i-comment"/></svg>加註解</button>
+  <button data-act="explain"><svg><use href="#i-explain"/></svg>解釋</button>
+  <button data-act="highlight"><svg><use href="#i-pen"/></svg>螢光筆</button>
+  <button data-act="copy"><svg><use href="#i-copy"/></svg>複製</button>
+</div>
+
+<!-- 浮動 AI 卡片：解釋、翻譯、提問、註解都用它 -->
+<div id="aiCard" class="aicard" hidden>
+  <div class="ahead"><span class="atitle"></span>
+    <button class="icon" data-k="copy" title="複製"><svg><use href="#i-copy"/></svg></button>
+    <button class="icon" data-k="close" title="關閉（Esc）"><svg><use href="#i-close"/></svg></button></div>
+  <div class="abody"></div>
+  <form class="afollow"><input placeholder="繼續問 …" aria-label="追問"><button class="icon" title="送出"><svg><use href="#i-send"/></svg></button></form>
+</div>
+
+<div id="citeCard" class="citecard" hidden></div>
+<div id="figCard" class="citecard figcard" hidden></div>
+
+<!-- 浮動聊天視窗 -->
+<button id="fab" class="fab" title="問 AI（聊天）"><svg><use href="#i-chat"/></svg></button>
+<div id="chatWin" class="chatwin" hidden>
+  <div class="chead"><b>和這篇論文聊聊</b>
+    <button id="chatClear" class="link small">清除對話</button>
+    <button id="chatClose" class="icon" title="關閉"><svg><use href="#i-close"/></svg></button></div>
+  <div id="chatOut" class="feed"></div>
+  <form id="chatForm" class="chatbox">
+    <textarea id="chatInput" rows="2" placeholder="問這篇論文任何問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+    <button class="icon send" title="送出"><svg><use href="#i-send"/></svg></button>
+  </form>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

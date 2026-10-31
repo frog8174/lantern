@@ -1,0 +1,110 @@
+"""檢索（Retrieval）：問問題時，從論文裡找出最相關的幾段給 LLM 看。
+
+這就是 RAG（Retrieval-Augmented Generation，檢索增強生成）：
+  1. 切塊（chunking）：把論文切成 ~800 字元的段落，記住它在第幾頁
+  2. 建索引：每段算一個向量（embedding），或用 BM25 關鍵字統計
+  3. 查詢：問題也轉向量 → 算相似度 → 取前 k 段
+  4. 把這 k 段連同頁碼塞進 prompt，要求模型回答時標註 [p.X]
+
+短論文其實可以整篇塞進 context（見 features.paper_context），
+RAG 主要是為了長論文 / 小 context 的本地模型。
+"""
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter
+
+import numpy as np
+
+from . import config, db, llm
+from .pdf_parse import Block
+
+CHUNK_CHARS = 800
+
+
+def make_chunks(blocks: list[Block]) -> list[dict]:
+    """相鄰、同頁的 block 合併到大約 CHUNK_CHARS 字元。"""
+    chunks: list[dict] = []
+    cur: dict | None = None
+    for b in blocks:
+        if len(b.text) < 3:
+            continue
+        if cur and cur["page"] == b.page and len(cur["text"]) + len(b.text) < CHUNK_CHARS:
+            cur["text"] += " " + b.text
+            cur["bbox"].append(b.bbox)
+        else:
+            if cur:
+                chunks.append(cur)
+            cur = {"page": b.page, "text": b.text, "bbox": [b.bbox]}
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+async def build_index(pid: str, blocks: list[Block]) -> int:
+    chunks = make_chunks(blocks)
+    vecs = await llm.embed([c["text"] for c in chunks])
+    if vecs:
+        for c, v in zip(chunks, vecs):
+            arr = np.asarray(v, dtype=np.float32)
+            c["emb"] = (arr / (np.linalg.norm(arr) + 1e-9)).tobytes()  # 先正規化，之後內積 = cosine
+        # 記下是哪個模型算的：換了 embedding 模型，舊向量就不能跟新的問題向量比
+        db.cache_set(pid, "embed_model", config.EMBED_MODEL)
+    db.save_chunks(pid, chunks)
+    return len(chunks)
+
+
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+|[一-鿿]")
+
+
+def _tokens(text: str) -> list[str]:
+    return [t.lower() for t in _TOKEN_RE.findall(text)]
+
+
+def _bm25(query: str, docs: list[str], k1: float = 1.5, b: float = 0.75) -> list[float]:
+    """BM25：經典關鍵字排序法。詞在這段出現越多、在全部段落越稀有，分數越高。"""
+    toks = [_tokens(d) for d in docs]
+    avgdl = sum(map(len, toks)) / max(1, len(toks))
+    df = Counter(t for ts in toks for t in set(ts))
+    n = len(docs)
+    q = _tokens(query)
+    scores = []
+    for ts in toks:
+        tf = Counter(ts)
+        s = 0.0
+        for t in q:
+            if t not in tf:
+                continue
+            idf = math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5))
+            s += idf * tf[t] * (k1 + 1) / (tf[t] + k1 * (1 - b + b * len(ts) / avgdl))
+        scores.append(s)
+    return scores
+
+
+async def search(pid: str, query: str, k: int = 6) -> list[dict]:
+    chunks = db.load_chunks(pid)
+    if not chunks:
+        return []
+    texts = [c["text"] for c in chunks]
+    kw = np.asarray(_bm25(query, texts))
+    if kw.max() > 0:
+        kw = kw / kw.max()
+
+    score = kw
+    # 向量是目前這個 embedding 模型算的才用；換過模型的舊論文退回 BM25（重新匯入即可重建向量）
+    same_model = db.cache_get(pid, "embed_model") == config.EMBED_MODEL
+    if chunks[0]["emb"] is not None and same_model:
+        qv = await llm.embed([query])
+        if qv:
+            q = np.asarray(qv[0], dtype=np.float32)
+            q /= np.linalg.norm(q) + 1e-9
+            mat = np.stack([np.frombuffer(c["emb"], dtype=np.float32) for c in chunks])
+            if mat.shape[1] == q.shape[0]:
+                sem = mat @ q
+                # 混合檢索：語意相似度為主，關鍵字補強（專有名詞、公式符號很有用）
+                score = 0.7 * sem + 0.3 * kw
+
+    top = np.argsort(-score)[:k]
+    hits = [chunks[i] | {"score": float(score[i])} for i in top if score[i] > 0]
+    return sorted(hits, key=lambda c: (c["page"], c["idx"]))  # 照閱讀順序排，模型比較好理解

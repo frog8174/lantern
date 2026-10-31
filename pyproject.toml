@@ -1,0 +1,28 @@
+[project]
+name = "lantern-paper-reader"
+version = "0.1.0"
+description = "個人用 AI 論文閱讀器（仿 Moonlight），接 vLLM 或任何 OpenAI 相容 API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=2.3.0",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "openai>=1.40",
+    "pymupdf>=1.24",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.29",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
