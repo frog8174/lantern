@@ -7,7 +7,7 @@
 - annotations ：使用者的螢光筆與註解
 - messages    ：每篇論文的聊天紀錄
 - users / workspaces / workspace_papers：使用者、各自的 workspace、論文 ↔ workspace（多對多）
-- wiki_pages / wiki_ingested：workspace 的 LLM wiki 頁面、已整理過的論文（規格見 docs/wiki.md）
+- wiki_pages / wiki_ingested / wiki_messages：workspace 的 LLM wiki 頁面、已整理過的論文、wiki 問答紀錄（規格見 docs/wiki.md）
 """
 from __future__ import annotations
 
@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS wiki_pages (
 );
 CREATE TABLE IF NOT EXISTS wiki_ingested (
   workspace_id TEXT, paper_id TEXT, ingested REAL, PRIMARY KEY (workspace_id, paper_id)
+);
+CREATE TABLE IF NOT EXISTS wiki_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT, role TEXT, content TEXT, created REAL
 );
 """
 
@@ -188,7 +191,7 @@ def rename_workspace(wid: str, name: str) -> None:
 def delete_workspace(wid: str) -> None:
     with conn() as c:
         c.execute("DELETE FROM workspaces WHERE id=?", (wid,))
-        for t in ("workspace_papers", "wiki_pages", "wiki_ingested"):
+        for t in ("workspace_papers", "wiki_pages", "wiki_ingested", "wiki_messages"):
             c.execute(f"DELETE FROM {t} WHERE workspace_id=?", (wid,))
 
 
@@ -235,6 +238,34 @@ def wiki_pending(wid: str) -> list[str]:
 def wiki_mark_ingested(wid: str, pid: str) -> None:
     with conn() as c:
         c.execute("INSERT OR REPLACE INTO wiki_ingested VALUES (?,?,?)", (wid, pid, time.time()))
+
+
+def wiki_backlinks(uid: str, pid: str) -> list[dict]:
+    """使用者自己的 workspace 中，sources 含這篇的 wiki 頁（論文頁排最前）。"""
+    with conn() as c:
+        rows = c.execute("SELECT w.id AS workspace_id, w.name AS workspace_name, p.slug, p.title "
+                         "FROM wiki_pages p JOIN workspaces w ON w.id = p.workspace_id "
+                         "WHERE w.user_id=? AND EXISTS (SELECT 1 FROM json_each(p.sources) WHERE value=?) "
+                         "ORDER BY p.slug != ?, w.name, p.title", (uid, pid, f"paper-{pid}")).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_wiki_message(wid: str, role: str, content: str) -> None:
+    with conn() as c:
+        c.execute("INSERT INTO wiki_messages (workspace_id, role, content, created) VALUES (?,?,?,?)",
+                  (wid, role, content, time.time()))
+
+
+def list_wiki_messages(wid: str, limit: int = 50) -> list[dict]:
+    with conn() as c:
+        rows = c.execute("SELECT role, content FROM wiki_messages WHERE workspace_id=? ORDER BY id DESC LIMIT ?",
+                         (wid, limit)).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
+def clear_wiki_messages(wid: str) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM wiki_messages WHERE workspace_id=?", (wid,))
 
 
 # ---------- chunks ----------

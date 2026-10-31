@@ -103,8 +103,8 @@ def test_upload_into_workspace(client, bob, pdfs):
 def test_auto_translate_setting(client, pdfs):
     import time
     from backend import db
-    assert client.get("/api/me/settings").json() == {"auto_translate": False}
-    assert client.put("/api/me/settings", json={"auto_translate": True}).json() == {"auto_translate": True}
+    assert client.get("/api/me/settings").json() == {"auto_translate": False, "auto_wiki": False}
+    assert client.put("/api/me/settings", json={"auto_translate": True}).json() == {"auto_translate": True, "auto_wiki": False}
     try:
         pid = client.post("/api/papers", files={"file": ("n.pdf", pdfs["numeric"].read_bytes(), "application/pdf")}).json()["id"]
         for _ in range(100):  # 背景任務在 app 的事件迴圈裡跑

@@ -52,3 +52,53 @@ def test_wiki_update(client, bob, pdfs, monkeypatch):
         assert not c.execute("SELECT 1 FROM wiki_ingested WHERE paper_id=?", (pid,)).fetchall()
     client.delete(f"/api/workspaces/{w['id']}")
     assert db.wiki_pages(w["id"]) == []
+
+
+def test_wiki_ask_and_backlinks(client, bob, pdfs, monkeypatch):
+    monkeypatch.setattr(config, "LLM_MOCK", True)
+    w = client.post("/api/workspaces", json={"name": "Ask"}).json()
+    ask = f"/api/workspaces/{w['id']}/ask"
+    with open(pdfs["numeric"], "rb") as f:
+        pid = client.post("/api/papers", files={"file": ("a.pdf", f, "application/pdf")},
+                          data={"workspace": w["id"]}).json()["id"]
+    assert client.post(ask, json={"question": "q"}).status_code == 400  # wiki 還沒有頁面
+    sse(client, "POST", f"/api/workspaces/{w['id']}/wiki/update")
+
+    text, _, err = sse(client, "POST", ask, {"question": "這篇在做什麼？"})
+    assert err is None and text
+    assert client.get(ask).json() == [{"role": "user", "content": "這篇在做什麼？"},
+                                      {"role": "assistant", "content": text}]
+    assert client.delete(ask).json() == {"ok": True} and client.get(ask).json() == []
+
+    r = client.post(ask + "/save", json={"question": "Q", "answer": f"A [[paper:{pid}#p1]] [[paper:zzz#p2]]"}).json()
+    assert r["slug"].startswith("qa-") and r["title"]
+    assert client.get(f"/api/workspaces/{w['id']}/wiki/{r['slug']}").json()["sources"] == [pid]
+
+    links = client.get(f"/api/papers/{pid}/wiki").json()
+    assert links[0] == {"workspace_id": w["id"], "workspace_name": "Ask", "slug": f"paper-{pid}", "title": "MOCK 論文頁"}
+    assert {"index", "mock-concept", r["slug"]} <= {x["slug"] for x in links}
+
+    assert bob.get(f"/api/papers/{pid}/wiki").status_code == 404
+    assert bob.get(ask).status_code == 404 and bob.delete(ask).status_code == 404
+    assert bob.post(ask, json={"question": "q"}).status_code == 404
+    assert bob.post(ask + "/save", json={"question": "q", "answer": "a"}).status_code == 404
+    client.delete(f"/api/workspaces/{w['id']}")
+    assert db.list_wiki_messages(w["id"]) == [] and client.get(f"/api/papers/{pid}/wiki").json() == []
+    client.delete(f"/api/papers/{pid}")
+
+
+def test_auto_wiki(client, papers, monkeypatch):
+    import time
+    monkeypatch.setattr(config, "LLM_MOCK", True)
+    client.put("/api/me/settings", json={"auto_wiki": True})
+    try:
+        w = client.post("/api/workspaces", json={"name": "Auto"}).json()
+        client.post(f"/api/workspaces/{w['id']}/papers", json={"paper_id": papers["numeric"]["id"]})
+        for _ in range(100):  # 背景任務在 app 的事件迴圈裡跑
+            if not db.wiki_pending(w["id"]) and w["id"] not in main._wiki_jobs:
+                break
+            time.sleep(0.1)
+        assert db.wiki_pending(w["id"]) == [] and db.wiki_page(w["id"], "index")
+        client.delete(f"/api/workspaces/{w['id']}")
+    finally:
+        client.put("/api/me/settings", json={"auto_wiki": False})

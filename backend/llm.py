@@ -328,6 +328,8 @@ def _mock_json(messages: list):
     if "paper_page" in prompt:  # workspace wiki 規劃
         return {"paper_page": {"title": "MOCK 論文頁", "markdown": "（MOCK）論文頁 [[mock-concept]]"},
                 "concepts": [{"slug": "mock-concept", "title": "Mock Concept", "note": "MOCK 重點"}]}
+    if "qa_page" in prompt:  # wiki 問答存成頁面
+        return {"title": "MOCK 問答", "markdown": "# MOCK 問答\n（MOCK）整理後的問答"}
     if "highlight" in prompt.lower():
         return {"novelty": [], "method": [], "result": []}
     return {"outline": []}

@@ -306,6 +306,45 @@ async def update_wiki(wid: str) -> AsyncIterator[dict]:
     yield {"msg": "Wiki 已更新", "done": total, "total": total}
 
 
+async def wiki_ask_messages(wid: str, history: list[dict], question: str) -> list:
+    """Wiki 問答：先查 wiki（放得下全帶，放不下請 LLM 挑 ≤6 頁），再從挑中頁面的來源論文補原文段落。"""
+    pages = [db.wiki_page(wid, p["slug"]) for p in db.wiki_pages(wid)]
+    if sum(_est_tokens(p["markdown"]) for p in pages) >= config.LLM_CONTEXT_TOKENS * 0.6:
+        listing = "\n".join(f"- {p['slug']}：{p['title']}\n  {p['markdown'][:300]}" for p in pages)
+        data = await llm.complete_json([{"role": "user", "content":
+            f"wiki 頁面：\n{listing}\n\n---\n問題：{question}\n\n"
+            '挑出回答這個問題最需要的頁面（最多 6 頁），只輸出 JSON：{"slugs":["..."]}'}],
+            task="wiki", max_tokens=400)
+        want = data.get("slugs") if isinstance(data, dict) else None
+        picked = [p for p in pages if p["slug"] in (want or [])][:6]
+        pages = picked or pages[:6]  # 模型沒挑出能用的就退回前幾頁（index 排第一）
+    # shortcut: 來源論文多時段落總量可能超過 context；之後可依分數截斷
+    excerpts = []
+    for pid in sorted({s for p in pages for s in p["sources"]}):
+        for h in await retrieval.search(pid, question, k=4):
+            excerpts.append(f"[[paper:{pid}#p{h['page'] + 1}]] {h['text']}")
+    wiki = "\n\n".join(f"=== [[{p['slug']}]] {p['title']} ===\n{p['markdown']}" for p in pages)
+    context = f"Wiki 頁面：\n\n{wiki}\n\n原文段落（引用時照前面的標記寫）：\n\n" + ("\n\n".join(excerpts) or "（無）")
+    sys = WIKI_RULES + ("\n現在要根據 wiki 回答使用者的問題：以 wiki 內容為主、原文段落補細節，"
+                        "說法附 [[paper:<論文id>#p<頁碼>]] 引用，可用 [[slug]] 指向相關 wiki 頁。"
+                        "wiki 和段落都沒寫到的要明說「wiki 中沒有提到」。")
+    msgs = [{"role": "system", "content": sys},
+            {"role": "user", "content": f"以下是 wiki 內容，之後的問題都以此為準：\n\n{context}"},
+            {"role": "assistant", "content": "好的，我已讀完，請問。"}]
+    return msgs + history[-10:] + [{"role": "user", "content": question}]
+
+
+async def wiki_qa_page(question: str, answer: str) -> dict:
+    """把一則問答整理成 wiki 頁：回 {title, markdown}。"""
+    data = await llm.complete_json([{"role": "system", "content": WIKI_RULES}, {"role": "user", "content":
+        f"問題：{question}\n\n回答：\n{answer}\n\n---\n請把這則問答整理成一頁 wiki（qa_page）："
+        "保留所有 [[paper:...]] 引用與 [[slug]] 連結，第一行用「# 」寫頁名。"
+        '只輸出 JSON：{"title":"短標題","markdown":"..."}'}], task="wiki", max_tokens=4000)
+    data = data if isinstance(data, dict) else {}
+    return {"title": str(data.get("title") or question[:40]),
+            "markdown": _strip_fence(str(data.get("markdown") or answer))}
+
+
 # ---------------- 自動標註 ----------------
 HL_COLORS = {"novelty": "purple", "method": "blue", "result": "green"}
 

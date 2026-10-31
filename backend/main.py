@@ -89,6 +89,7 @@ def me(uid: Uid):
 
 class SettingsIn(BaseModel):
     auto_translate: bool = False  # 上傳後在背景先把整篇對照翻譯跑完
+    auto_wiki: bool = False  # 論文加入 workspace 就在背景更新該 workspace 的 wiki
 
 
 @app.get("/api/me/settings")
@@ -168,6 +169,7 @@ async def _ingest(uid: str, pid: str, filename: str, path: str, workspace: str |
     db.add_paper(uid, pid, filename, parsed.title, meta)
     if workspace:
         db.add_to_workspace(workspace, pid)
+        _auto_wiki(uid, workspace)
     if db.get_settings(uid).get("auto_translate"):
         task = asyncio.create_task(_pretranslate(pid))
         _bg_tasks.add(task)  # 留住參考，不然 task 可能被回收
@@ -677,10 +679,11 @@ def delete_workspace(wid: str, uid: Uid):
 
 
 @app.post("/api/workspaces/{wid}/papers")
-def add_to_workspace(wid: str, body: PaperRefIn, uid: Uid):
+async def add_to_workspace(wid: str, body: PaperRefIn, uid: Uid):  # async：背景任務要在事件迴圈裡建立
     _ws_or_404(wid, uid)
     _paper_or_404(body.paper_id, uid)
     db.add_to_workspace(wid, body.paper_id)
+    _auto_wiki(uid, wid)
     return {"ok": True}
 
 
@@ -697,16 +700,35 @@ def remove_from_workspace(wid: str, pid: str, uid: Uid):
 _wiki_jobs: dict[str, list] = {}  # shortcut: in-process state, breaks with multiple uvicorn workers
 
 
-async def _wiki_job(wid: str) -> None:
+async def _wiki_job(wid: str, uid: str) -> None:
     steps = _wiki_jobs[wid]
     try:
-        async for step in features.update_wiki(wid):
-            steps.append(step)
+        while True:
+            async for step in features.update_wiki(wid):
+                steps.append(step)
+            # 跑的期間又加了論文、且 auto_wiki 仍開著 → 接著再跑一輪
+            if not (db.wiki_pending(wid) and db.get_settings(uid).get("auto_wiki")):
+                break
     except Exception as e:  # 已整理好的論文已寫入 wiki_ingested，再按一次只做剩下的
         steps.append({"error": f"{type(e).__name__}: {e}"})
     finally:
         steps.append(None)
         _wiki_jobs.pop(wid, None)
+
+
+def _start_wiki(wid: str, uid: str) -> list:
+    """沒在跑就啟動背景更新；回傳該任務的進度串列。"""
+    if wid not in _wiki_jobs:
+        _wiki_jobs[wid] = []
+        task = asyncio.create_task(_wiki_job(wid, uid))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+    return _wiki_jobs[wid]
+
+
+def _auto_wiki(uid: str, wid: str) -> None:
+    if db.get_settings(uid).get("auto_wiki"):
+        _start_wiki(wid, uid)
 
 
 @app.get("/api/workspaces/{wid}/wiki")
@@ -728,12 +750,7 @@ def wiki_page(wid: str, slug: str, uid: Uid):
 async def wiki_update(wid: str, uid: Uid):
     """開始更新；已經在跑就接上同一個進度（不會跑第二份）。"""
     _ws_or_404(wid, uid)
-    if wid not in _wiki_jobs:
-        _wiki_jobs[wid] = []
-        task = asyncio.create_task(_wiki_job(wid))
-        _bg_tasks.add(task)
-        task.add_done_callback(_bg_tasks.discard)
-    steps = _wiki_jobs[wid]
+    steps = _start_wiki(wid, uid)
 
     async def follow() -> AsyncIterator[str]:
         i = 0
@@ -748,6 +765,55 @@ async def wiki_update(wid: str, uid: Uid):
             yield json.dumps(step, ensure_ascii=False)
 
     return sse(follow())
+
+
+class AskIn(BaseModel):
+    question: str
+
+
+class QaIn(BaseModel):
+    question: str
+    answer: str
+
+
+@app.post("/api/workspaces/{wid}/ask")
+async def wiki_ask(wid: str, uid: Uid, body: AskIn):
+    _ws_or_404(wid, uid)
+    if not db.wiki_pages(wid):
+        raise HTTPException(400, "先按更新 Wiki")
+    msgs = await features.wiki_ask_messages(wid, db.list_wiki_messages(wid), body.question)
+    db.add_wiki_message(wid, "user", body.question)
+    return sse(llm.stream_chat(msgs, task="wiki"), on_done=lambda t: db.add_wiki_message(wid, "assistant", t))
+
+
+@app.get("/api/workspaces/{wid}/ask")
+def wiki_ask_history(wid: str, uid: Uid):
+    _ws_or_404(wid, uid)
+    return db.list_wiki_messages(wid)
+
+
+@app.delete("/api/workspaces/{wid}/ask")
+def wiki_ask_clear(wid: str, uid: Uid):
+    _ws_or_404(wid, uid)
+    db.clear_wiki_messages(wid)
+    return {"ok": True}
+
+
+@app.post("/api/workspaces/{wid}/ask/save")
+async def wiki_ask_save(wid: str, uid: Uid, body: QaIn):
+    _ws_or_404(wid, uid)
+    page = await features.wiki_qa_page(body.question, body.answer)
+    cited = set(re.findall(r"\[\[paper:([\w-]+)", body.answer))
+    sources = sorted(cited & {p["id"] for p in db.list_papers(uid, wid)})  # 只收這個 workspace 的論文
+    slug = f"qa-{db.new_id()}"
+    db.wiki_save(wid, slug, page["title"], page["markdown"], sources)
+    return {"slug": slug, "title": page["title"]}
+
+
+@app.get("/api/papers/{pid}/wiki")
+def paper_wiki(pid: str, uid: Uid):
+    _paper_or_404(pid, uid)
+    return db.wiki_backlinks(uid, pid)
 
 
 @app.get("/api/health")
