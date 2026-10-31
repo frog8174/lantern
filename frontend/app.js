@@ -1510,18 +1510,78 @@ async function showWs(ws = curWs) {
 
 /** 只重畫論文卡片（背景翻譯輪詢也走這裡，不動分頁、Wiki、上傳狀態）。 */
 async function renderWsCards(ws) {
-  const papers = wsPaperList = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
-  const del = ws ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
-  $("#wsPapers").innerHTML = papers.map((p) => `<div class="card" data-id="${escapeHTML(p.id)}">
-      <button class="copen">${escapeHTML(p.title || p.filename)}</button>
-      ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
-      <span class="ccount">${fmtDate(p.created)}</span>${trRing(p)}
-      <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
-    || `<p class="cards-empty">${ws ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+  wsPaperList = ws ? await api(`/api/papers?workspace=${encodeURIComponent(ws.id)}`) : (await loadLibrary(), library);
+  // 正在寫備註或看引用時不重畫，免得打到一半被洗掉；關掉編輯器／對話框時會用最新清單重畫
+  if (!cardsBusy()) paintWsCards();
   // 有論文還在背景翻譯：過幾秒再刷新，直到都跑完或離開這頁
-  if (papers.some((p) => p.translating)) setTimeout(() => {
+  if (wsPaperList.some((p) => p.translating)) setTimeout(() => {
     if (document.body.dataset.view === "ws" && curWs === ws) renderWsCards(ws);
   }, 4000);
+}
+const cardsBusy = () => !!$("#wsPapers .cnote-ed") || $("#citeDlg").open;
+
+// 排序在前端做（清單已經抓回來了）；同分時用加入時間新→舊
+const SORTS = {
+  new: (a, b) => b.created - a.created,
+  old: (a, b) => a.created - b.created,
+  title: (a, b) => (a.title || a.filename).localeCompare(b.title || b.filename, "zh-Hant", { sensitivity: "base" }) || b.created - a.created,
+  star: (a, b) => !!b.starred - !!a.starred || b.created - a.created,
+  // 沒年份當 -∞ 排最後；兩篇都沒有會得 NaN，落到加入時間
+  year: (a, b) => (b.year ?? -Infinity) - (a.year ?? -Infinity) || b.created - a.created,
+};
+let wsSort = store.get("lantern.wsSort", "new");
+if (!SORTS[wsSort]) wsSort = "new";
+$("#wsSort").value = wsSort;
+$("#wsSort").onchange = (e) => { wsSort = e.target.value; store.set("lantern.wsSort", wsSort); paintWsCards(); };
+
+/** 用 wsPaperList 畫卡片；focusId + sel 指定重畫後焦點放回哪顆按鈕。 */
+function paintWsCards(focusId, sel) {
+  const del = curWs ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
+  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}" data-id="${escapeHTML(p.id)}">
+      <button class="copen">${escapeHTML(p.title || p.filename)}</button>
+      ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
+      ${p.note ? `<p class="cnote">${escapeHTML(p.note)}</p>` : ""}
+      <div class="cfoot"><span class="ccount">${fmtDate(p.created)}</span><span class="cacts">
+        <button class="cact cstar" aria-pressed="${!!p.starred}" aria-label="星號" title="${p.starred ? "取消星號" : "加星號"}">${p.starred ? "★" : "☆"}</button>
+        <button class="cact cnote-btn" aria-expanded="false" title="${p.note ? "編輯備註" : "寫備註"}"><svg aria-hidden="true"><use href="#i-pen"/></svg>備註</button>
+        <button class="cact ccite" aria-haspopup="dialog" title="複製引用格式"><svg aria-hidden="true"><use href="#i-quote"/></svg>引用</button>
+      </span></div>${trRing(p)}
+      <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
+    || `<p class="cards-empty">${curWs ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+  if (focusId) $(`#wsPapers .card[data-id="${CSS.escape(focusId)}"] ${sel}`)?.focus();
+}
+const cardPaper = (id) => wsPaperList.find((x) => x.id === id);
+// 回傳 {tags, note, starred}；寫回目前清單裡那一筆（輪詢可能已經換掉清單物件）
+const patchPaper = async (id, body) => Object.assign(cardPaper(id) || {}, await api(`/api/papers/${id}`, { method: "PATCH", body }));
+
+/** 在卡片裡展開備註編輯框：失焦或 Ctrl+Enter 存，Esc 放棄。 */
+function openNote(card, p) {
+  const ta = document.createElement("textarea");
+  ta.className = "cnote-ed"; ta.rows = 4; ta.value = p.note || "";
+  ta.placeholder = "寫下這篇的重點或待辦…";
+  ta.setAttribute("aria-label", `《${p.title || p.filename}》的備註（Ctrl+Enter 儲存，Esc 取消）`);
+  const old = card.querySelector(".cnote");
+  old ? old.replaceWith(ta) : card.querySelector(".cfoot").before(ta);
+  card.querySelector(".cnote-btn").setAttribute("aria-expanded", "true");
+  ta.focus();
+  let done = false;
+  ta.onblur = async () => {
+    if (done) return;
+    done = true;
+    const note = ta.value.trim();
+    try {
+      if (note !== (cardPaper(p.id)?.note || "")) await patchPaper(p.id, { note });
+      paintWsCards(p.id, ".cnote-btn");
+    } catch (err) {  // 存失敗：留著編輯框和內容，再點進去、離開就會重試
+      done = false;
+      card.querySelector(".cerr")?.remove();
+      ta.insertAdjacentHTML("afterend", `<p class="cerr" role="alert">備註沒存到：${escapeHTML(err.message)}</p>`);
+    }
+  };
+  ta.onkeydown = (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ta.blur(); }
+    else if (e.key === "Escape") { e.stopPropagation(); done = true; paintWsCards(p.id, ".cnote-btn"); }
+  };
 }
 
 /** 背景對照翻譯的進度圈（只有圈，不顯示數字）；沒開始翻譯的論文不畫。 */
@@ -1532,8 +1592,16 @@ function trRing(p) {
     <circle cx="10" cy="10" r="8"/><circle class="fill" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pct} 100"/></svg>`;
 }
 $("#wsPapers").onclick = async (e) => {
-  const id = e.target.closest(".card")?.dataset.id;
-  if (!id) return;
+  const card = e.target.closest(".card");
+  const id = card?.dataset.id;
+  if (!id || e.target.closest(".cnote-ed")) return;
+  if (e.target.closest(".cstar")) {
+    try { await patchPaper(id, { starred: !cardPaper(id)?.starred }); }
+    catch (err) { $("#wsStatus").textContent = `星號沒存到：${err.message}`; return; }
+    return paintWsCards(id, ".cstar");
+  }
+  if (e.target.closest(".cnote-btn")) return card.querySelector(".cnote-ed")?.focus() ?? openNote(card, cardPaper(id));
+  if (e.target.closest(".ccite")) return openCite(cardPaper(id));
   if (!e.target.closest(".cdel")) return openPaper(id);
   if (curWs) await api(`/api/workspaces/${curWs.id}/papers/${id}`, { method: "DELETE" });
   else if (confirm("刪除這篇論文與所有標註？")) await api(`/api/papers/${id}`, { method: "DELETE" });
@@ -1541,13 +1609,45 @@ $("#wsPapers").onclick = async (e) => {
   showWs();
 };
 
+/* 引用對話框：GET /api/papers/{pid}/cite，第一次比較慢（後端要去查書目） */
+const CITE_STYLES = [["apa", "APA 7"], ["ieee", "IEEE"], ["mla", "MLA 9"], ["bibtex", "BibTeX"]];
+let citePid = null, citeStyles = {};
+async function openCite(p) {
+  citePid = p.id; citeStyles = {};
+  $("#citePaper").textContent = p.title || p.filename;
+  $("#citeBody").innerHTML = '<p class="muted small">正在取得書目資料…第一次會花幾秒。</p>';
+  $("#citeDlg").showModal();
+  try {
+    const { styles } = await api(`/api/papers/${p.id}/cite`);
+    if (citePid !== p.id) return;
+    citeStyles = styles;
+    $("#citeBody").innerHTML = CITE_STYLES.filter(([k]) => styles[k]).map(([k, name]) => `<section class="cstyle" data-k="${k}">
+        <div class="chead"><span>${name}</span><button class="small ccopy" data-k="${k}"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>複製</span></button></div>
+        <pre>${escapeHTML(styles[k])}</pre></section>`).join("")
+      || '<p class="muted small">這篇論文的書目資料不夠，產生不了引用。</p>';
+  } catch (err) {
+    if (citePid === p.id) $("#citeBody").innerHTML = `<p class="err small">取不到書目資料：${escapeHTML(err.message)}</p>`;
+  }
+}
+$("#citeBody").onclick = async (e) => {
+  const b = e.target.closest(".ccopy");
+  if (!b) return;
+  const label = b.querySelector("span");
+  try { await navigator.clipboard.writeText(citeStyles[b.dataset.k]); label.textContent = "已複製"; }
+  catch { label.textContent = "無法複製，請手動選取"; }
+  clearTimeout(b._t); b._t = setTimeout(() => (label.textContent = "複製"), 2000);
+};
+$("#citeClose").onclick = () => $("#citeDlg").close();
+// 開著時輪詢沒重畫卡片：關掉後補畫，焦點回到「引用」鈕
+$("#citeDlg").onclose = () => { const id = citePid; citePid = null; paintWsCards(id, ".ccite"); };
+
 /* ---------------- Workspace Wiki（docs/wiki.md） ---------------- */
 let wsTab = "papers", wsPaperList = [], wikiSlug = null, wikiBusy = false;
 
 function setWsTab(t) {
   wsTab = t;
   $$("#wsTabs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === t));
-  $("#wsPapers").hidden = t !== "papers";
+  $("#wsPapers").hidden = $("#wsSort").hidden = t !== "papers";
   $("#wsWiki").hidden = t !== "wiki";
   $("#wsAsk").hidden = t !== "ask";
   if (t === "ask") loadAsk();

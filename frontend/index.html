@@ -84,6 +84,10 @@
       <h2 id="wsTitle" class="vtitle"></h2>
     </div>
     <div class="vacts">
+      <select id="wsSort" class="sortsel" aria-label="論文排序" title="論文排序">
+        <option value="new">加入時間（新→舊）</option><option value="old">加入時間（舊→新）</option>
+        <option value="title">標題 A–Z</option><option value="star">星號優先</option><option value="year">出版年份</option>
+      </select>
       <input type="file" id="wsFile" accept="application/pdf" hidden><button id="wsUpload" class="tool">上傳 PDF</button>
       <button id="wsArxiv" class="tool">匯入 arXiv</button>
       <button id="wsAdd" class="tool ws-only">加入既有論文</button>
@@ -121,6 +125,13 @@
 <dialog id="addDlg" class="dlg">
   <div class="row"><b>加入既有論文</b><button class="icon" id="addClose" title="關閉"><svg><use href="#i-close"/></svg></button></div>
   <ul id="addList" class="list"></ul>
+</dialog>
+
+<!-- 論文卡的「引用」：四種格式各自複製 -->
+<dialog id="citeDlg" class="dlg" aria-labelledby="citeHead">
+  <div class="row"><b id="citeHead">複製引用</b><button class="icon" id="citeClose" title="關閉" aria-label="關閉"><svg><use href="#i-close"/></svg></button></div>
+  <p id="citePaper" class="muted small"></p>
+  <div id="citeBody" aria-live="polite"></div>
 </dialog>
 
 <!-- 使用者設定 -->
