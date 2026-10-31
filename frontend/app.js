@@ -1781,17 +1781,24 @@ async function loadAsk() {
     <button class="tool" data-go="wiki">到 Wiki 分頁</button></div>`);
 }
 
-/** 一則問答：問題排成條目標題，回答是一張羊皮紙；q 是回答前那個問題（存成 Wiki 頁要一起送）。 */
+/** 一則問答：問題是可收合的條目標題（<details>），回答是一張羊皮紙放在同一個條目裡；
+ *  q 是回答前那個問題（存成 Wiki 頁要一起送）。 */
 function addAsk(role, text, q) {
+  if (role === "user") {
+    const item = document.createElement("details");
+    item.className = "qitem";
+    item.open = true;
+    item.innerHTML = '<summary class="qa user"></summary>';
+    item.firstChild.textContent = text;
+    $("#askOut").appendChild(item);
+    return item.firstChild;
+  }
   const d = document.createElement("div");
   d.className = `qa ${role}`;
-  if (role === "user") d.textContent = text;
-  else {
-    d.innerHTML = '<div class="wbody qbody" aria-live="polite"></div>';
-    renderWiki(d.firstChild, text);
-    if (text) addSave(d, q, text);
-  }
-  $("#askOut").appendChild(d);
+  d.innerHTML = '<div class="wbody qbody" aria-live="polite"></div>';
+  renderWiki(d.firstChild, text);
+  if (text) addSave(d, q, text);
+  ($("#askOut > .qitem:last-of-type") || $("#askOut")).appendChild(d);
   return d;
 }
 
