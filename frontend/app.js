@@ -177,7 +177,7 @@ $("#libSearch").addEventListener("keydown", async (e) => {
   const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
   for (const h of hits) {
     const li = document.createElement("li");
-    li.innerHTML = `<div><div class="small muted">${escapeHTML(h.title)} · p.${h.page + 1}</div>
+    li.innerHTML = `<div><div class="small muted">${escapeHTML(h.title)}　p.${h.page + 1}</div>
       <div class="small">${escapeHTML(h.snippet).replace(re, (m) => `<mark>${m}</mark>`)}</div></div>`;
     li.onclick = async () => {
       if (S.paper?.id !== h.paper_id) await openPaper(h.paper_id);
@@ -912,11 +912,11 @@ async function showCite(items, at) {
     const links = [doi && `<a href="${safeUrl(`https://doi.org/${doi}`)}" target="_blank" rel="noopener">原文（DOI）</a>`,
                    ax && `<a href="${safeUrl(`https://arxiv.org/abs/${ax}`)}" target="_blank" rel="noopener">arXiv</a>`,
                    `<a href="${safeUrl(`https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`)}" target="_blank" rel="noopener">Google Scholar</a>`]
-      .filter(Boolean).join(" · ");
+      .filter(Boolean).join("　");
     div.innerHTML = `<div class="tag small">${escapeHTML(items[k].label)}</div>
       ${p ? `<h4><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">${escapeHTML(p.title)}</a></h4>
         <div class="small muted">${escapeHTML((p.authors || []).slice(0, 4).map((a) => a.name).join(", "))}${(p.authors || []).length > 4 ? ` +${p.authors.length - 4}` : ""}
-        · ${escapeHTML(p.venue || "")} ${p.year ?? ""}</div>
+        　${escapeHTML(p.venue || "")} ${p.year ?? ""}</div>
         ${abs ? `<p class="small abs">${escapeHTML(abs)}</p>${abs.length > 260 ? '<button class="link small" data-k="more">展開</button>' : ""}` : ""}`
         : `<div class="raw">${escapeHTML(r.raw)}</div>`}
       ${r.note ? `<div class="small warn">${escapeHTML(r.note)}</div>` : ""}
@@ -1209,7 +1209,7 @@ function flashItem(id) {
 function renderInfo() {
   const p = S.paper;
   $("#paperInfo").innerHTML = `<h3>${escapeHTML(p.title)}</h3>
-    <div class="small muted">${p.num_pages} 頁 · ${p.references} 筆參考文獻 · ${escapeHTML(p.filename)}</div>
+    <div class="small muted">${p.num_pages} 頁　${p.references} 筆參考文獻　${escapeHTML(p.filename)}</div>
     ${p.abstract ? `<details open><summary class="small">摘要（原文）</summary><p class="small">${escapeHTML(p.abstract)}</p></details>` : ""}`;
 }
 
@@ -1361,7 +1361,7 @@ async function loadRelated(url) {
     const abs = r.abstract || "";
     li.innerHTML = `<a href="${safeUrl(r.url)}" target="_blank" rel="noopener">${escapeHTML(r.title)}</a>
       <div class="small muted">${escapeHTML((r.authors || []).slice(0, 3).map((a) => a.name).join(", "))}${(r.authors || []).length > 3 ? " 等" : ""}
-        · ${r.year ?? ""}${r.venue ? " · " + escapeHTML(r.venue) : ""} · 被引用 ${r.citationCount ?? "?"} 次</div>
+        　${r.year ?? ""}${r.venue ? "　" + escapeHTML(r.venue) : ""}　被引用 ${r.citationCount ?? "?"} 次</div>
       ${abs ? `<details class="small"><summary>摘要</summary>${escapeHTML(abs)}</details>` : ""}
       <div class="acts">${r.in_library ? '<span class="small muted">✓ 已在論文庫</span>'
         : ax ? `<button class="link small" data-ax="${escapeHTML(ax)}">匯入 arXiv:${escapeHTML(ax)}</button>` : ""}</div>`;
@@ -1486,14 +1486,14 @@ async function showHome() {
   [workspaces] = await Promise.all([api("/api/workspaces"), loadLibrary()]);
   $("#wsGrid").innerHTML = tile("", "全部論文", library.length, "all")
     + workspaces.map((w) => tile(w.id, w.name, w.count)).join("")
-    + '<button class="card new" data-new="1"><span class="plus">＋</span>新增 workspace</button>'
-    + (workspaces.length ? "" : '<p class="cards-empty">還沒有 workspace。按「＋ 新增 workspace」把論文依主題分類；論文本身都會留在「全部論文」。</p>');
+    + '<button class="card new" data-new="1"><span class="plus">＋</span>新增研究主題</button>'
+    + (workspaces.length ? "" : '<p class="cards-empty">還沒有研究主題。按「＋ 新增研究主題」把論文依主題分類；論文本身都會留在「全部論文」。</p>');
 }
 $("#wsGrid").onclick = async (e) => {
   const b = e.target.closest("button.card");
   if (!b) return;
   if (!b.dataset.new) return showWs(workspaces.find((w) => w.id === b.dataset.id) || null);
-  const name = prompt("新 workspace 的名稱（例如：RAG、待讀）")?.trim();
+  const name = prompt("新研究主題的名稱（例如：RAG、待讀）")?.trim();
   if (name) showWs(await api("/api/workspaces", { method: "POST", body: { name } }));
 };
 
@@ -1536,7 +1536,7 @@ $("#wsSort").onchange = (e) => { wsSort = e.target.value; store.set("lantern.wsS
 
 /** 用 wsPaperList 畫卡片；focusId + sel 指定重畫後焦點放回哪顆按鈕。 */
 function paintWsCards(focusId, sel) {
-  const del = curWs ? "移出這個 workspace（論文本身保留）" : "刪除這篇論文";
+  const del = curWs ? "移出這個研究主題（論文本身保留）" : "刪除這篇論文";
   $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}" data-id="${escapeHTML(p.id)}">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
       ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
@@ -1547,7 +1547,7 @@ function paintWsCards(focusId, sel) {
         <button class="cact ccite" aria-haspopup="dialog" title="複製引用格式"><svg aria-hidden="true"><use href="#i-quote"/></svg>引用</button>
       </span></div>${trRing(p)}
       <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
-    || `<p class="cards-empty">${curWs ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+    || `<p class="cards-empty">${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
   if (focusId) $(`#wsPapers .card[data-id="${CSS.escape(focusId)}"] ${sel}`)?.focus();
 }
 const cardPaper = (id) => wsPaperList.find((x) => x.id === id);
@@ -1687,7 +1687,7 @@ async function loadWiki() {
   try {
     w = await api(`/api/workspaces/${ws.id}/wiki`);
   } catch (e) {
-    page.innerHTML = `<p class="cards-empty err">讀不到這個 workspace 的 Wiki：${escapeHTML(e.message)}</p>`;
+    page.innerHTML = `<p class="cards-empty err">讀不到這個研究主題的 Wiki：${escapeHTML(e.message)}</p>`;
     return;
   }
   if (curWs?.id !== ws.id) return;
@@ -1696,7 +1696,7 @@ async function loadWiki() {
   if (w.running && !wikiBusy) $("#wikiUpdate").onclick();  // 重新整理前已在跑：接回進度
   $("#wikiList").innerHTML = w.pages.map((p) => `<li><button class="witem${p.slug === "index" ? " home" : ""}" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</button></li>`).join("");
   if (!w.pages.length) {
-    page.innerHTML = `<div class="wempty"><h3>這個 workspace 還沒有 Wiki</h3>
+    page.innerHTML = `<div class="wempty"><h3>這個研究主題還沒有 Wiki</h3>
       <p>按「更新 Wiki」，Lantern 會逐篇讀過這裡的論文，為每篇寫一頁重點，把反覆出現的方法、概念與資料集整理成跨論文的條目，最後寫一頁總覽串起全部。</p>
       <p>每個說法都標著出處，點一下就回到論文的那一頁。之後加入新論文再按一次，只會整理新的那幾篇。</p>
       ${w.pending ? "" : "<p>先到「論文」分頁加入論文，才有東西可以整理。</p>"}</div>`;
@@ -1777,7 +1777,7 @@ async function loadAsk() {
   $("#qaInput").disabled = $("#qaForm button").disabled = empty;
   $("#askClear").hidden = !msgs.length;
   if (empty) out.insertAdjacentHTML("beforeend", `<div class="wempty qempty"><h3>先有 Wiki，才能問</h3>
-    <p>問答會先查這個 workspace 的 Wiki 再回答。現在還沒有任何 Wiki 頁：到 Wiki 分頁按「更新 Wiki」，整理好就能回來問。</p>
+    <p>問答會先查這個研究主題的 Wiki 再回答。現在還沒有任何 Wiki 頁：到 Wiki 分頁按「更新 Wiki」，整理好就能回來問。</p>
     <button class="tool" data-go="wiki">到 Wiki 分頁</button></div>`);
 }
 
@@ -1937,7 +1937,7 @@ $("#wsAdd").onclick = async () => {
   await loadLibrary();
   const rest = library.filter((p) => !inWs.has(p.id));
   $("#addList").innerHTML = rest.map((p) => `<li><button class="aitem" data-id="${escapeHTML(p.id)}">${escapeHTML(p.title || p.filename)}</button></li>`).join("")
-    || '<li class="muted small">所有論文都已經在這個 workspace 裡了。</li>';
+    || '<li class="muted small">所有論文都已經在這個研究主題裡了。</li>';
   $("#addDlg").showModal();
 };
 $("#addList").onclick = async (e) => {
@@ -1949,11 +1949,11 @@ $("#addList").onclick = async (e) => {
 };
 $("#addClose").onclick = () => $("#addDlg").close();
 $("#wsRename").onclick = async () => {
-  const name = prompt("workspace 名稱", curWs.name)?.trim();
+  const name = prompt("研究主題名稱", curWs.name)?.trim();
   if (name && name !== curWs.name) showWs(await api(`/api/workspaces/${curWs.id}`, { method: "PATCH", body: { name } }));
 };
 $("#wsDelete").onclick = async () => {
-  if (!confirm(`刪除 workspace「${curWs.name}」？裡面的論文不會刪除，仍在「全部論文」。`)) return;
+  if (!confirm(`刪除研究主題「${curWs.name}」？裡面的論文不會刪除，仍在「全部論文」。`)) return;
   await api(`/api/workspaces/${curWs.id}`, { method: "DELETE" });
   showHome();
 };

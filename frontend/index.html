@@ -6,8 +6,8 @@
 <title>Lantern 論文閱讀器</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- 標題 Cormorant Garamond、英文內文 Libre Baskerville、中文 Noto Serif TC（思源宋體） -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Noto+Serif+TC:wght@400;600;700&display=swap">
+<!-- 標題 Source Serif 4 + Noto Serif TC、內文 LXGW WenKai TC、工具 Noto Sans TC（docs/design.md） -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&family=LXGW+WenKai+TC:wght@400;700&family=Source+Serif+4:wght@400;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -54,13 +54,12 @@
     </div>
     <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
   </div>
-  <div id="userBox" class="userbox"><span id="userName"></span> · <button id="btnSettings" class="link small">設定</button> · <button id="btnLogout" class="link small">登出</button></div>
+  <div id="userBox" class="userbox"><span id="userName"></span><button id="btnSettings" class="link small">設定</button><button id="btnLogout" class="link small">登出</button></div>
 </header>
 
 <!-- 登入頁：測試登入，選一個使用者 -->
 <section id="loginView" class="view"><div class="vinner">
   <div class="moon"></div>
-  <p class="eyebrow">Lantern</p>
   <h2 class="vtitle">請問是哪一位讀者？</h2>
   <p class="vlede">測試登入：免密碼，點一下名片就進入自己的論文庫。</p>
   <div id="userGrid" class="cards users"></div>
@@ -69,9 +68,8 @@
 <!-- 首頁：全部論文 + 各個 workspace -->
 <section id="homeView" class="view"><div class="vinner">
   <div class="vhead"><div>
-    <p class="eyebrow">Library</p>
     <h2 class="vtitle">論文庫</h2>
-    <p class="vlede">依主題分成 workspace；同一篇論文可以放進好幾個。</p>
+    <p class="vlede">依研究主題分類；同一篇論文可以放進好幾個。</p>
   </div></div>
   <div id="wsGrid" class="cards tiles"></div>
 </div></section>
@@ -92,7 +90,7 @@
       <button id="wsArxiv" class="tool">匯入 arXiv</button>
       <button id="wsAdd" class="tool ws-only">加入既有論文</button>
       <button id="wsRename" class="tool ws-only">改名</button>
-      <button id="wsDelete" class="tool ws-only">刪除 workspace</button>
+      <button id="wsDelete" class="tool ws-only">刪除研究主題</button>
     </div>
   </div>
   <!-- 「論文｜Wiki｜問答」分頁；全部論文沒有 wiki，ws-only 會把它藏起來 -->
@@ -112,10 +110,10 @@
   </div>
   <!-- Wiki 問答：先查這個 workspace 的 Wiki 再回答 -->
   <div id="wsAsk" class="ask" hidden>
-    <div class="ahead"><p class="muted">回答會先查這個 workspace 的 Wiki，每個說法都標著出處。</p><button id="askClear" class="link small">清空對話</button></div>
+    <div class="ahead"><p class="muted">回答會先查這個研究主題的 Wiki，每個說法都標著出處。</p><button id="askClear" class="link small">清空對話</button></div>
     <div id="askOut"></div>
     <form id="qaForm" class="chatbox askbox">
-      <textarea id="qaInput" rows="2" aria-label="問這個 workspace 的 Wiki" placeholder="問一個跨論文的問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+      <textarea id="qaInput" rows="2" aria-label="問這個研究主題的 Wiki" placeholder="問一個跨論文的問題…（Enter 送出，Shift+Enter 換行）"></textarea>
       <button class="icon send" title="送出" aria-label="送出"><svg><use href="#i-send"/></svg></button>
     </form>
   </div>
@@ -140,7 +138,7 @@
   <label class="setting"><input type="checkbox" id="setAutoTranslate">
     <span>上傳後先在背景把整篇對照翻譯跑完<br><span class="muted small">打開論文時譯文已經備好；每篇論文會多花一次整篇翻譯的 token。</span></span></label>
   <label class="setting"><input type="checkbox" id="setAutoWiki">
-    <span>論文加入 workspace 就自動更新 Wiki<br><span class="muted small">不必再到 Wiki 分頁按「更新 Wiki」；每加一篇會多花一次整理 Wiki 的 token。</span></span></label>
+    <span>論文加入研究主題就自動更新 Wiki<br><span class="muted small">不必再到 Wiki 分頁按「更新 Wiki」；每加一篇會多花一次整理 Wiki 的 token。</span></span></label>
 </dialog>
 
 <main>
@@ -177,7 +175,7 @@
     <div id="empty" class="empty">
       <div class="moon"></div>
       <p>從左邊匯入一篇論文開始閱讀。</p>
-      <p class="muted small">選取文字 → 解釋 / 螢光筆 / 翻譯 / 提問　·　點 [12] 看引用　·　Ctrl/⌘＋拖曳 框選圖表　·　右鍵 加註解</p>
+      <p class="muted small">選取文字 → 解釋 / 螢光筆 / 翻譯 / 提問　　點 [12] 看引用　　Ctrl/⌘＋拖曳 框選圖表　　右鍵 加註解</p>
     </div>
     <div id="pages"></div>
   </section>
