@@ -1,0 +1,11 @@
+# SQLite、PDF、縮圖都在這裡。ReadWriteOnce + 單副本（SQLite 只能單寫者）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lantern-data
+spec:
+  accessModes: [ReadWriteOnce]
+  # storageClassName: TODO     # 叢集預設以外的 StorageClass 才需要填
+  resources:
+    requests:
+      storage: 20Gi

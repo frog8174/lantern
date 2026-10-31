@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lantern
+  labels: { app: lantern }
+spec:
+  replicas: 1                 # SQLite 單寫者、背景工作在記憶體：多副本前要先換 Postgres 與工作佇列
+  strategy:
+    type: Recreate            # RWO PVC 不能同時掛兩個 Pod；先停舊的再起新的
+  selector:
+    matchLabels: { app: lantern }
+  template:
+    metadata:
+      labels: { app: lantern }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001        # PVC 交給 uid 10001 寫
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: lantern
+          image: lantern      # kustomization.yaml 換成實際映像
+          ports:
+            - { name: http, containerPort: 7800 }
+          envFrom:
+            - configMapRef: { name: lantern-config }
+            - secretRef: { name: lantern-secrets }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          # /api/livez 不碰模型；/api/health 會真的呼叫模型（花錢、慢），不要拿來當 probe
+          startupProbe:
+            httpGet: { path: /api/livez, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /api/livez, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/livez, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 2Gi }   # PyMuPDF 解析／算圖大 PDF 時會吃記憶體
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: lantern-data }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }

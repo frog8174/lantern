@@ -1,0 +1,14 @@
+# 非機密設定。機密（client secret、session secret、模型 API key）放 Secret lantern-secrets，見 docs/deploy.md
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lantern-config
+data:
+  AUTH_MODE: oidc
+  OIDC_ISSUER: https://keycloak.toolmen.bime.ntu.edu.tw/realms/Toolmen_application
+  OIDC_CLIENT_ID: lantern                       # TODO: 正式環境的 Keycloak client（和本機的 lantern-local 分開）
+  PUBLIC_BASE_URL: https://LANTERN_HOST         # TODO: Lantern 公開網域，必須和 Ingress host 一致
+  SESSION_MAX_AGE: "28800"
+  SEMANTIC_SCHOLAR_LOOKUP: "true"
+  # 模型設定：照本機 .env 的非機密項目搬過來（LLM_PROVIDER、LLM_MODEL、LLM_MODEL_*、TARGET_LANG…，對照 .env.example）
+  LLM_PROVIDER: anthropic
