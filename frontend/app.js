@@ -1674,7 +1674,7 @@ async function loadAsk() {
     addAsk(m.role, m.content, q);
   }
   const empty = !w.pages.length;
-  $("#askInput").disabled = $("#askForm button").disabled = empty;
+  $("#qaInput").disabled = $("#qaForm button").disabled = empty;
   $("#askClear").hidden = !msgs.length;
   if (empty) out.insertAdjacentHTML("beforeend", `<div class="wempty qempty"><h3>先有 Wiki，才能問</h3>
     <p>問答會先查這個 workspace 的 Wiki 再回答。現在還沒有任何 Wiki 頁：到 Wiki 分頁按「更新 Wiki」，整理好就能回來問。</p>
@@ -1736,15 +1736,15 @@ async function sendAsk(q) {
     askBusy = false;
   }
 }
-$("#askForm").onsubmit = (e) => {
+$("#qaForm").onsubmit = (e) => {
   e.preventDefault();
-  const q = $("#askInput").value.trim();
+  const q = $("#qaInput").value.trim();
   if (!q || askBusy) return;
-  $("#askInput").value = "";
+  $("#qaInput").value = "";
   sendAsk(q);
 };
-$("#askInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#askForm").requestSubmit(); }
+$("#qaInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#qaForm").requestSubmit(); }
 });
 // 不用 confirm()：第一下只是「上膛」，三秒內再按一次才真的清空
 $("#askClear").onclick = async (e) => {

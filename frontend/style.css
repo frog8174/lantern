@@ -579,7 +579,8 @@ a.wref:hover { text-decoration-style: solid; }
 .qstat:empty { display: none; }
 .qstat a.wref { margin-left: .5em; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
 .qempty { margin-top: 30px; }
-.askbox { position: sticky; bottom: 0; margin-top: 28px; padding: 12px 0 6px; background: var(--paper); border-top: 1px solid var(--rule-strong); }
+/* 陰影往下補滿頁面底部留白，捲動時回答不會從輸入框底下露出來 */
+.askbox { position: sticky; bottom: 0; margin-top: 28px; padding: 12px 0 6px; background: var(--paper); border-top: 1px solid var(--rule-strong); box-shadow: 0 64px 0 var(--paper); }
 .askbox textarea { background: var(--vellum); min-height: var(--tap); font-size: 15px; }
 .askbox .send { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
 @media (prefers-reduced-motion: reduce) { .qsavebtn::before { transition: none; } }
