@@ -54,7 +54,7 @@
     </div>
     <button id="togglePanel" class="icon" title="活動面板"><svg><use href="#i-panel"/></svg></button>
   </div>
-  <div id="userBox" class="userbox"><span id="userName"></span> · <button id="btnLogout" class="link small">登出</button></div>
+  <div id="userBox" class="userbox"><span id="userName"></span> · <button id="btnSettings" class="link small">設定</button> · <button id="btnLogout" class="link small">登出</button></div>
 </header>
 
 <!-- 登入頁：測試登入，選一個使用者 -->
@@ -99,6 +99,13 @@
 <dialog id="addDlg" class="dlg">
   <div class="row"><b>加入既有論文</b><button class="icon" id="addClose" title="關閉"><svg><use href="#i-close"/></svg></button></div>
   <ul id="addList" class="list"></ul>
+</dialog>
+
+<!-- 使用者設定 -->
+<dialog id="setDlg" class="dlg">
+  <div class="row"><b>設定</b><button class="icon" id="setClose" title="關閉"><svg><use href="#i-close"/></svg></button></div>
+  <label class="setting"><input type="checkbox" id="setAutoTranslate">
+    <span>上傳後先在背景把整篇對照翻譯跑完<br><span class="muted small">打開論文時譯文已經備好；每篇論文會多花一次整篇翻譯的 token。</span></span></label>
 </dialog>
 
 <main>

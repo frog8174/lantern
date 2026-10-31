@@ -98,3 +98,20 @@ def test_upload_into_workspace(client, bob, pdfs):
     client.delete(f"/api/papers/{pid}")  # 刪論文也清掉 workspace 關聯
     assert client.get("/api/workspaces").json()[0]["count"] == 0
     client.delete(f"/api/workspaces/{w['id']}")
+
+
+def test_auto_translate_setting(client, pdfs):
+    import time
+    from backend import db
+    assert client.get("/api/me/settings").json() == {"auto_translate": False}
+    assert client.put("/api/me/settings", json={"auto_translate": True}).json() == {"auto_translate": True}
+    try:
+        pid = client.post("/api/papers", files={"file": ("n.pdf", pdfs["numeric"].read_bytes(), "application/pdf")}).json()["id"]
+        for _ in range(100):  # 背景任務在 app 的事件迴圈裡跑
+            if db.cache_get(pid, "block_translation", "0"):
+                break
+            time.sleep(0.1)
+        assert any(b.get("tr") for b in db.cache_get(pid, "block_translation", "0"))
+        client.delete(f"/api/papers/{pid}")
+    finally:
+        client.put("/api/me/settings", json={"auto_translate": False})

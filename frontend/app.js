@@ -1540,6 +1540,14 @@ $("#wsDelete").onclick = async () => {
 };
 $("#wsBack").onclick = showHome;
 $("#btnHome").onclick = showHome;
+$("#btnSettings").onclick = async () => {
+  $("#setAutoTranslate").checked = (await api("/api/me/settings")).auto_translate;
+  $("#setDlg").showModal();
+};
+$("#setAutoTranslate").onchange = async (e) => {
+  e.target.checked = (await api("/api/me/settings", { method: "PUT", body: { auto_translate: e.target.checked } })).auto_translate;
+};
+$("#setClose").onclick = () => $("#setDlg").close();
 $("#btnLogout").onclick = async () => {
   await api("/api/auth/logout", { method: "POST" });
   history.replaceState(null, "", location.pathname);

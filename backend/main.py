@@ -87,6 +87,21 @@ def me(uid: Uid):
     return db.get_user(uid)
 
 
+class SettingsIn(BaseModel):
+    auto_translate: bool = False  # 上傳後在背景先把整篇對照翻譯跑完
+
+
+@app.get("/api/me/settings")
+def get_settings(uid: Uid):
+    return SettingsIn(**db.get_settings(uid)).model_dump()
+
+
+@app.put("/api/me/settings")
+def put_settings(body: SettingsIn, uid: Uid):
+    db.set_settings(uid, body.model_dump())
+    return body.model_dump()
+
+
 # ---------------- 工具函式 ----------------
 def _paper_or_404(pid: str, uid: str) -> dict:
     p = db.get_paper(pid)
@@ -153,6 +168,10 @@ async def _ingest(uid: str, pid: str, filename: str, path: str, workspace: str |
     db.add_paper(uid, pid, filename, parsed.title, meta)
     if workspace:
         db.add_to_workspace(workspace, pid)
+    if db.get_settings(uid).get("auto_translate"):
+        task = asyncio.create_task(_pretranslate(pid))
+        _bg_tasks.add(task)  # 留住參考，不然 task 可能被回收
+        task.add_done_callback(_bg_tasks.discard)
     return {"id": pid, "title": parsed.title, "num_pages": parsed.num_pages, "chunks": n,
             "scanned_pages": len(parsed.scanned_pages), "ocr_pages": len(parsed.ocr_pages),
             "ocr_error": ocr_error, "ocr_enabled": config.OCR_ENABLED}
@@ -320,28 +339,44 @@ async def translate_page(pid: str, uid: Uid, body: PageIn):
 async def translate_blocks(pid: str, uid: Uid, body: PageIn):
     """對照翻譯（SSE）。第一則訊息是整頁的區塊座標 {"blocks": [...]}，
     之後每翻完一段推一則 {"i": 序號, "tr": 譯文}。整頁翻完才寫快取。"""
-    p = _paper_or_404(pid, uid)
-    key = str(body.page)
+    return sse(_block_translation(_paper_or_404(pid, uid), body.page))
 
-    async def gen() -> AsyncIterator[str]:
-        cached = db.cache_get(pid, "block_translation", key)
-        if cached:
-            yield json.dumps({"blocks": cached}, ensure_ascii=False)
+
+async def _block_translation(p: dict, page: int) -> AsyncIterator[str]:
+    pid, key = p["id"], str(page)
+    cached = db.cache_get(pid, "block_translation", key)
+    if cached:
+        yield json.dumps({"blocks": cached}, ensure_ascii=False)
+        return
+    blocks = [{"bbox": b.bbox, "text": b.text, "size": b.size}
+              for b in await asyncio.to_thread(pdf_parse.page_blocks, _pdf_path(pid), page)]
+    yield json.dumps({"blocks": blocks}, ensure_ascii=False)
+    failed = False
+    async for item in features.stream_block_translation(p, blocks):
+        if "error" in item:
+            failed = True
+        else:
+            blocks[item["i"]]["tr"] = item["tr"]
+        yield json.dumps(item, ensure_ascii=False)
+    if not failed:
+        db.cache_set(pid, "block_translation", blocks, key)
+
+
+_bg_tasks: set[asyncio.Task] = set()
+
+
+async def _pretranslate(pid: str) -> None:
+    """背景逐頁跑對照翻譯，結果進快取；之後打開那頁就直接顯示。"""
+    # shortcut: 使用者若在背景跑完前打開同一頁，會重複翻一次（多花一點 token）；之後可加 per-page 鎖
+    p = db.get_paper(pid)
+    for page in range(p["meta"]["num_pages"]):
+        if not db.get_paper(pid):  # 中途被刪了就停
             return
-        blocks = [{"bbox": b.bbox, "text": b.text, "size": b.size}
-                  for b in await asyncio.to_thread(pdf_parse.page_blocks, _pdf_path(pid), body.page)]
-        yield json.dumps({"blocks": blocks}, ensure_ascii=False)
-        failed = False
-        async for item in features.stream_block_translation(p, blocks):
-            if "error" in item:
-                failed = True
-            else:
-                blocks[item["i"]]["tr"] = item["tr"]
-            yield json.dumps(item, ensure_ascii=False)
-        if not failed:
-            db.cache_set(pid, "block_translation", blocks, key)
-
-    return sse(gen())
+        try:
+            async for _ in _block_translation(p, page):
+                pass
+        except Exception as e:  # 某頁失敗不影響其他頁；打開那頁時會再試
+            print(f"[pretranslate] {pid} p.{page}: {type(e).__name__}: {e}")
 
 
 class ImageIn(BaseModel):

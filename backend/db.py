@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS annotations (
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT, paper_id TEXT, role TEXT, content TEXT, created REAL
 );
-CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, created REAL);
+CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, created REAL, settings TEXT DEFAULT '{}');
 CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, created REAL);
 CREATE TABLE IF NOT EXISTS workspace_papers (
   workspace_id TEXT, paper_id TEXT, added REAL, PRIMARY KEY (workspace_id, paper_id)
@@ -60,8 +60,11 @@ def conn():
 def init() -> None:
     with conn() as c:
         c.executescript(SCHEMA)
+        # 舊資料庫升級：users 加上 settings 欄（JSON 物件）
+        if "settings" not in {r["name"] for r in c.execute("PRAGMA table_info(users)")}:
+            c.execute("ALTER TABLE users ADD COLUMN settings TEXT DEFAULT '{}'")
         # 測試使用者：user id = 名字
-        c.executemany("INSERT OR IGNORE INTO users VALUES (?,?,?)",
+        c.executemany("INSERT OR IGNORE INTO users (id, name, created) VALUES (?,?,?)",
                       [(u, u, time.time()) for u in config.TEST_USERS])
 
 
@@ -69,6 +72,17 @@ def get_user(uid: str) -> dict | None:
     with conn() as c:
         r = c.execute("SELECT id, name FROM users WHERE id=?", (uid,)).fetchone()
     return dict(r) if r else None
+
+
+def get_settings(uid: str) -> dict:
+    with conn() as c:
+        r = c.execute("SELECT settings FROM users WHERE id=?", (uid,)).fetchone()
+    return json.loads(r["settings"] or "{}") if r else {}
+
+
+def set_settings(uid: str, settings: dict) -> None:
+    with conn() as c:
+        c.execute("UPDATE users SET settings=? WHERE id=?", (json.dumps(settings, ensure_ascii=False), uid))
 
 
 def list_users() -> list[dict]:

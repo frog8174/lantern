@@ -476,6 +476,8 @@ body[data-view="login"] #userBox { display: none; }
 .dlg { border: 1px solid var(--rule-strong); border-top: 3px solid var(--accent); border-radius: var(--radius-sm); background: var(--vellum);
   color: var(--ink); box-shadow: var(--shadow-float); width: min(520px, calc(100vw - 32px)); max-height: 70vh; padding: 12px 16px 16px; }
 .dlg::backdrop { background: var(--backdrop); }
+.dlg .setting { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; max-width: 42ch; cursor: pointer; line-height: 1.5; }
+.dlg .setting input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--accent); }
 .dlg .row b { font-family: var(--font-display); font-style: italic; font-size: 19px; }
 .dlg .list { margin-top: 8px; max-height: calc(70vh - 70px); overflow-y: auto; }
 .dlg .list li { min-height: var(--tap); align-items: center; padding: 0; border-bottom: 1px solid var(--rule); }
