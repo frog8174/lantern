@@ -1601,7 +1601,7 @@ $("#wsPapers").onclick = async (e) => {
     return paintWsCards(id, ".cstar");
   }
   if (e.target.closest(".cnote-btn")) return card.querySelector(".cnote-ed")?.focus() ?? openNote(card, cardPaper(id));
-  if (e.target.closest(".ccite")) return openCite(cardPaper(id));
+  if (e.target.closest(".ccite")) return openCiteDlg(cardPaper(id));
   if (!e.target.closest(".cdel")) return openPaper(id);
   if (curWs) await api(`/api/workspaces/${curWs.id}/papers/${id}`, { method: "DELETE" });
   else if (confirm("刪除這篇論文與所有標註？")) await api(`/api/papers/${id}`, { method: "DELETE" });
@@ -1612,7 +1612,7 @@ $("#wsPapers").onclick = async (e) => {
 /* 引用對話框：GET /api/papers/{pid}/cite，第一次比較慢（後端要去查書目） */
 const CITE_STYLES = [["apa", "APA 7"], ["ieee", "IEEE"], ["mla", "MLA 9"], ["bibtex", "BibTeX"]];
 let citePid = null, citeStyles = {};
-async function openCite(p) {
+async function openCiteDlg(p) {
   citePid = p.id; citeStyles = {};
   $("#citePaper").textContent = p.title || p.filename;
   $("#citeBody").innerHTML = '<p class="muted small">正在取得書目資料…第一次會花幾秒。</p>';
