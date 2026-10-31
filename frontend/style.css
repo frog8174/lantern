@@ -497,3 +497,62 @@ body[data-view="login"] #userBox { display: none; }
   .tiles .card { --card-pad: 14px; } .tiles .card .cname { font-size: 17px; }
   .tiles .card::before { top: 14px; left: 14px; }
 }
+
+/* ---- Workspace Wiki：「論文｜Wiki」分頁 + 讀起來像一本研究筆記的條目頁 ---- */
+.wtabs { display: flex; gap: 18px; margin-top: 10px; }
+.wtabs button { border: none; background: none; padding: 6px 2px; min-height: var(--tap); color: var(--ink-2);
+  font-family: var(--font-display); font-style: italic; font-size: 19px; border-bottom: 2px solid transparent; border-radius: 0; }
+.wtabs button:hover { background: none; color: var(--ink); }
+.wtabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--oxblood); }
+.wiki { display: grid; grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); gap: 36px; margin-top: 22px; align-items: start; }
+.wnav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; }
+.wupd { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.wupd button { min-height: var(--tap); border-color: var(--rule-strong); color: var(--accent); }
+#wikiBar { width: 100%; height: 3px; border: none; background: var(--rule); appearance: none; }
+#wikiBar::-webkit-progress-bar { background: var(--rule); }
+#wikiBar::-webkit-progress-value { background: var(--gilt); }
+#wikiBar::-moz-progress-bar { background: var(--gilt); }
+#wikiProg:empty { display: none; }
+.wlist { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--rule); }
+.witem { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; padding: 9px 10px 9px 12px; min-height: var(--tap);
+  line-height: 1.4; color: var(--ink-2); border-left: 2px solid transparent; overflow-wrap: anywhere; }
+.witem:hover { color: var(--ink); background: var(--leaf); }
+.witem:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.witem[aria-current="page"] { color: var(--ink); border-left-color: var(--oxblood); background: var(--vellum); }
+/* 首頁（index）是目錄：用品牌的金色菱形標出來，和其他條目隔一道線 */
+.witem.home { font-family: var(--font-display); font-style: italic; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.witem.home::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--gilt); transform: rotate(45deg); }
+.wlist li:first-child:has(.home) { border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
+/* 條目頁：一張羊皮紙，窄欄、寬行距，標題下一小段金線 */
+.wpage { background: var(--vellum); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-page);
+  padding: clamp(20px, 4.5vw, 52px) clamp(18px, 5vw, 60px) 28px; min-width: 0; }
+.wpage:empty { display: none; }
+.wtitle { font-family: var(--font-display); font-weight: 600; font-style: italic; font-size: clamp(28px, 4vw, 38px); line-height: 1.12;
+  margin: 0 0 18px; max-width: 24ch; overflow-wrap: anywhere; }
+.wtitle::after { content: ""; display: block; width: 56px; margin-top: 14px; border-top: 2px solid var(--gilt); }
+.wtitle:focus { outline: none; } .wtitle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.wbody { max-width: 38em; font-size: 15px; line-height: 1.85; }
+.wbody > p:first-child { font-size: 16.5px; color: var(--ink); }
+.wbody.md h2 { font-size: 23px; margin: 1.6em 0 .4em; padding-top: .6em; border-top: 1px solid var(--rule); }
+.wbody.md h3 { font-size: 18px; }
+.wbody blockquote { max-height: none; font-size: inherit; }
+/* 站內連結：墨藍點線底，像書裡的「見某條」 */
+a.wref { color: var(--accent); text-decoration: underline dotted; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+a.wref:hover { text-decoration-style: solid; }
+/* 引用標記：抬高一點的小籤條，論文短名 + 朱褐頁碼 */
+.wcite { display: inline-flex; align-items: baseline; gap: .4em; vertical-align: .18em; margin: 0 .15em; padding: 0 .5em;
+  font: italic 600 .74em/1.6 var(--font-display); color: var(--ink-2); background: var(--leaf); border: 1px solid var(--rule-strong);
+  border-radius: 3px; white-space: nowrap; max-width: 100%; }
+.wcite .wcp { font: normal 400 .92em var(--font-text); font-variant-numeric: oldstyle-nums; color: var(--oxblood); padding-left: .4em;
+  border-left: 1px solid var(--rule-strong); }
+.wcite:hover { color: var(--ink); border-color: var(--oxblood); background: var(--leaf); }
+@media (pointer: coarse) { .wcite { padding: .25em .6em; } }
+.wmeta { margin: 28px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 12px; font-style: italic; }
+.wempty { max-width: 38em; }
+.wempty h3 { font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: 24px; margin: 0 0 8px; }
+.wempty p { color: var(--ink-2); line-height: 1.8; }
+@media (max-width: 760px) {
+  .wiki { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .wnav { position: static; }
+  .wlist { max-height: 40vh; overflow-y: auto; }
+}
