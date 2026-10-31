@@ -1489,9 +1489,21 @@ async function showWs(ws = curWs) {
   $("#wsPapers").innerHTML = papers.map((p) => `<div class="card" data-id="${escapeHTML(p.id)}">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
       ${p.tags.length ? `<div class="ptags">${p.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</div>` : ""}
-      <span class="ccount">${fmtDate(p.created)}</span>
+      <span class="ccount">${fmtDate(p.created)}</span>${trRing(p)}
       <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
     || `<p class="cards-empty">${ws ? "這個 workspace 還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</p>`;
+  // 有論文還在背景翻譯：過幾秒再刷新，直到都跑完或離開這頁
+  if (papers.some((p) => p.translating)) setTimeout(() => {
+    if (document.body.dataset.view === "ws" && curWs === ws) showWs(ws);
+  }, 4000);
+}
+
+/** 背景對照翻譯的進度圈（只有圈，不顯示數字）；沒開始翻譯的論文不畫。 */
+function trRing(p) {
+  if (!p.tr_done && !p.translating) return "";
+  const pct = Math.round(100 * Math.min(1, p.tr_done / (p.tr_total || 1)));
+  return `<svg class="tr-ring${pct >= 100 ? " done" : ""}" viewBox="0 0 20 20" role="img" aria-label="對照翻譯 ${pct}%">
+    <circle cx="10" cy="10" r="8"/><circle class="fill" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pct} 100"/></svg>`;
 }
 $("#wsPapers").onclick = async (e) => {
   const id = e.target.closest(".card")?.dataset.id;

@@ -110,7 +110,10 @@ def get_paper(pid: str) -> dict | None:
 
 
 def list_papers(uid: str, workspace: str | None = None) -> list[dict]:
-    sql = "SELECT p.id, p.filename, p.title, p.created, p.tags FROM papers p "
+    # tr_done / tr_total：已有對照翻譯快取的頁數 / 總頁數（給卡片上的進度圈）
+    sql = ("SELECT p.id, p.filename, p.title, p.created, p.tags, json_extract(p.meta, '$.num_pages') AS tr_total, "
+           "(SELECT COUNT(*) FROM cache k WHERE k.paper_id = p.id AND k.kind = 'block_translation') AS tr_done "
+           "FROM papers p ")
     args: tuple = (uid,)
     if workspace:
         sql += "JOIN workspace_papers w ON w.paper_id = p.id AND w.workspace_id = ? "

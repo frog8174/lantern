@@ -249,7 +249,7 @@ async def import_url(body: ArxivIn, uid: Uid):
 def papers(uid: Uid, workspace: str | None = None):
     if workspace:
         _ws_or_404(workspace, uid)
-    return db.list_papers(uid, workspace)
+    return [{**p, "translating": p["id"] in _translating} for p in db.list_papers(uid, workspace)]
 
 
 @app.get("/api/papers/{pid}")
@@ -363,20 +363,25 @@ async def _block_translation(p: dict, page: int) -> AsyncIterator[str]:
 
 
 _bg_tasks: set[asyncio.Task] = set()
+_translating: set[str] = set()  # 背景翻譯中的論文 id（卡片進度圈用）
 
 
 async def _pretranslate(pid: str) -> None:
     """背景逐頁跑對照翻譯，結果進快取；之後打開那頁就直接顯示。"""
     # shortcut: 使用者若在背景跑完前打開同一頁，會重複翻一次（多花一點 token）；之後可加 per-page 鎖
     p = db.get_paper(pid)
-    for page in range(p["meta"]["num_pages"]):
-        if not db.get_paper(pid):  # 中途被刪了就停
-            return
-        try:
-            async for _ in _block_translation(p, page):
-                pass
-        except Exception as e:  # 某頁失敗不影響其他頁；打開那頁時會再試
-            print(f"[pretranslate] {pid} p.{page}: {type(e).__name__}: {e}")
+    _translating.add(pid)
+    try:
+        for page in range(p["meta"]["num_pages"]):
+            if not db.get_paper(pid):  # 中途被刪了就停
+                return
+            try:
+                async for _ in _block_translation(p, page):
+                    pass
+            except Exception as e:  # 某頁失敗不影響其他頁；打開那頁時會再試
+                print(f"[pretranslate] {pid} p.{page}: {type(e).__name__}: {e}")
+    finally:
+        _translating.discard(pid)
 
 
 class ImageIn(BaseModel):

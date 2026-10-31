@@ -112,6 +112,8 @@ def test_auto_translate_setting(client, pdfs):
                 break
             time.sleep(0.1)
         assert any(b.get("tr") for b in db.cache_get(pid, "block_translation", "0"))
+        row = next(p for p in client.get("/api/papers").json() if p["id"] == pid)
+        assert row["tr_done"] >= 1 and row["tr_total"] >= row["tr_done"] and "translating" in row
         client.delete(f"/api/papers/{pid}")
     finally:
         client.put("/api/me/settings", json={"auto_translate": False})
