@@ -1,7 +1,7 @@
 # Graph Report - paper-reader  (2026-11-01)
 
 ## Corpus Check
-- 55 files · ~46,562 words
+- 55 files · ~46,681 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 7 file(s) not represented in the graph (top: (none) 4, .example 1, .css 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `24c89ae7`
+- Built from commit: `bfa7a18c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -406,7 +406,7 @@ Cohesion: 0.67
 Nodes (3): delete_paper(), 4.2 資料表（`backend/db.py`）, 資料表（`backend/db.py`）
 
 ## Knowledge Gaps
-- **13 isolated node(s):** `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules`, `BM25 retrieval`, `RAG for long papers` (+8 more)
+- **13 isolated node(s):** `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules`, `Semantic Scholar API`, `vLLM (Qwen3.5-9B)` (+8 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 479 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 

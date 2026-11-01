@@ -213,6 +213,13 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 /* 捲軸藏起來，由頁面導軌代替；滾輪、觸控板、鍵盤照常捲動這一欄 */
 .viewer { flex: 1; min-width: 0; overflow: auto; position: relative; padding: 28px 0 90px; scrollbar-width: none; }
 .viewer::-webkit-scrollbar { display: none; }
+/* 並排兩頁常比閱讀區寬：只露出橫向捲軸，直向仍由頁面導軌代替。
+   Chrome/Safari 走 ::-webkit-scrollbar（直向寬 0）；Firefox 無法分軸，兩向都會出現細捲軸 */
+.viewer:has(#pages.tr-side) { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+@supports selector(::-webkit-scrollbar) { .viewer:has(#pages.tr-side) { scrollbar-width: auto; scrollbar-color: auto; } }
+.viewer:has(#pages.tr-side)::-webkit-scrollbar { display: block; width: 0; height: 10px; }
+.viewer:has(#pages.tr-side)::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+.viewer:has(#pages.tr-side)::-webkit-scrollbar-thumb:hover { background-color: var(--ink-3); }
 .zoomctl { position: absolute; right: 64px; bottom: 16px; z-index: 6; display: flex; align-items: center; gap: 2px; padding: 3px 8px 3px 4px;
   background: var(--panel); border: 1px solid var(--rule-strong); border-radius: var(--radius); box-shadow: var(--shadow-float);
   font-variant-numeric: tabular-nums; }
