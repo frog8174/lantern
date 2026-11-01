@@ -307,6 +307,7 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .page .pno, .twin .pno { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-2);
   font-variant-numeric: tabular-nums; }
 /* 框選模式：十字游標＋頁面外一圈燈光虛線，一眼看得出已啟用；並排時譯文頁也能框（取同位置的原文頁圖） */
+.viewer.panning, .viewer.panning * { cursor: grabbing !important; user-select: none; }
 .cropping :is(.page, .twin) { cursor: crosshair; outline: 1.5px dashed var(--lamp); outline-offset: 4px; }
 .cropping :is(.textLayer, .trLayer) { pointer-events: none; }
 .cropBox { position: absolute; border: 1.5px solid #A06E14; background: rgba(232, 184, 92, .12); }

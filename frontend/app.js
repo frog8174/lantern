@@ -664,6 +664,19 @@ $("#viewer").addEventListener("wheel", (e) => {
   clearTimeout(wheelT);
   wheelT = setTimeout(() => { const f = wheelF; wheelF = 1; zoom(f); }, 150);
 }, { passive: false });
+// Ctrl／⌘＋拖曳：放大後頁面超出閱讀區時，抓著頁面移動（上下左右）
+$("#viewer").addEventListener("mousedown", (e) => {
+  const v = e.currentTarget;
+  if (e.button !== 0 || !(e.ctrlKey || e.metaKey) || S.cropping) return;
+  if (v.scrollWidth <= v.clientWidth && v.scrollHeight <= v.clientHeight) return;
+  e.preventDefault();
+  const x = e.clientX, y = e.clientY, l = v.scrollLeft, t = v.scrollTop;
+  v.classList.add("panning");
+  const move = (ev) => { v.scrollLeft = l - (ev.clientX - x); v.scrollTop = t - (ev.clientY - y); };
+  const up = () => { v.classList.remove("panning"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+  addEventListener("mousemove", move);
+  addEventListener("mouseup", up);
+});
 // 窄螢幕的左欄抽屜
 function setLibDrawer(on) {
   $("main").classList.toggle("showlib", on);
@@ -1394,7 +1407,7 @@ async function showCite(items, at) {
   });
 }
 
-/* ---------------- 框選圖表 / 公式：Ctrl/⌘（或 Shift）＋拖曳，或按「框選」 ---------------- */
+/* ---------------- 框選圖表 / 公式：Shift＋拖曳，或按「框選」（Ctrl/⌘＋拖曳 讓給移動頁面） ---------------- */
 let crop = null, cropDone = null;
 function setCropping(on) {
   S.cropping = on;
@@ -1405,7 +1418,7 @@ function clearCrop() { cropDone?.box.remove(); cropDone = null; $("#cropBar").hi
 $("#btnCrop").onclick = () => setCropping(!S.cropping);
 $("#pages").addEventListener("mousedown", (e) => {
   const pageEl = e.target.closest(".page, .twin");  // 譯文頁和原文頁同尺寸，框的位置直接對應
-  if (!pageEl || e.button !== 0 || !(S.cropping || e.shiftKey || e.ctrlKey || e.metaKey)) return;
+  if (!pageEl || e.button !== 0 || !(S.cropping || e.shiftKey)) return;
   e.preventDefault();
   clearCrop();
   if (!S.cropping) setCropping(true);
