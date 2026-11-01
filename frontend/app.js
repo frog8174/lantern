@@ -413,11 +413,8 @@ function drawHighlights(i) {
       layer.appendChild(d);
     }
     const [x0, y0] = a.rects[0] || [0, 0];
-    const side = x0 < 0.5 ? "left" : "right";  // 標籤放在離它最近的頁邊
-    if (AUTO[a.kind] && S.filter.labels) {
-      layer.insertAdjacentHTML("beforeend",
-        `<span class="mlabel ${side} ${a.kind.slice(5)}" style="top:${y0 * 100}%">${AUTO[a.kind]}</span>`);
-    } else if (a.kind === "comment") {
+    const side = x0 < 0.5 ? "left" : "right";  // 圖示放在離它最近的頁邊
+    if (a.kind === "comment") {
       const m = document.createElement("button");
       m.className = `cmark ${side}`;
       m.style.top = `${y0 * 100}%`;
@@ -427,6 +424,57 @@ function drawHighlights(i) {
       layer.appendChild(m);
     }
   }
+  drawLabels(i, layer);
+}
+
+/* 自動標註的頁邊標籤：寬螢幕放在紙外的留白（#pages 的 --mgut），細線箭頭指回那段字的第一行；
+ * 同一側依目標高度由上往下排、至少隔 LH，不互相疊。並排翻譯時一律放左邊，才不會蓋到譯文頁。
+ * 窄螢幕沒有留白，退回放在頁面白邊裡的舊樣式。 */
+const wideView = matchMedia("(min-width: 900px)");
+wideView.addEventListener("change", refreshHighlights);
+function drawLabels(i, layer) {
+  if (!S.filter.labels) return;
+  const list = S.annotations.filter((a) => a.page === i && AUTO[a.kind] && a.rects[0] && visibleOnPage(a));
+  const sideOf = (a) => (S.trMode === "side" || a.rects[0][0] < 0.5 ? "left" : "right");
+  if (!wideView.matches) {
+    for (const a of list) layer.insertAdjacentHTML("beforeend",
+      `<span class="mlabel ${sideOf(a)} ${a.kind.slice(5)}" style="top:${a.rects[0][1] * 100}%">${AUTO[a.kind]}</span>`);
+    return;
+  }
+  const el = S.pages[i].el, W = el.offsetWidth, H = el.offsetHeight;
+  const LH = 24, RUN = 28;  // 標籤列高（含間距）、引線在紙外的水平段（px）
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "mlead");
+  for (const s of ["left", "right"]) {
+    let floor = -Infinity;
+    const items = list.filter((a) => sideOf(a) === s).map((a) => {
+      const [x0, y0, x1, y1] = a.rects[0];
+      return { a, tx: s === "left" ? x0 * W - 3 : x1 * W + 3, ty: (y0 + y1) / 2 * H };
+    }).sort((p, q) => p.ty - q.ty);
+    for (const { a, tx, ty } of items) {
+      const y = floor = Math.max(ty, floor + LH);
+      const k = a.kind.slice(5), sx = s === "left" ? -RUN : W + RUN, bx = s === "left" ? -6 : W + 6;
+      const ang = Math.atan2(ty - y, tx - bx), tip = (d) => `${tx - 6 * Math.cos(ang + d)} ${ty - 6 * Math.sin(ang + d)}`;
+      const path = document.createElementNS(svg.namespaceURI, "path");
+      path.setAttribute("class", k);
+      path.setAttribute("d", `M${sx} ${y}L${bx} ${y}L${tx} ${ty}M${tip(0.45)}L${tx} ${ty}L${tip(-0.45)}`);
+      svg.appendChild(path);
+      const b = document.createElement("button");
+      b.className = `mlabel out ${s} ${k}`;
+      b.style.top = `${y}px`;
+      b.textContent = AUTO[a.kind];
+      b.title = "在筆記中查看";
+      const hot = (on) => {
+        path.classList.toggle("hot", on);
+        $$(`.hl[data-id="${a.id}"]`, layer).forEach((d) => d.classList.toggle("hot", on));
+      };
+      b.onmouseenter = b.onfocus = () => hot(true);
+      b.onmouseleave = b.onblur = () => hot(false);
+      b.onclick = () => { openPanel("notes"); flashItem(a.id); };
+      layer.appendChild(b);
+    }
+  }
+  layer.prepend(svg);
 }
 
 function visibleOnPage(a) {
@@ -1216,10 +1264,11 @@ function setTrMode(mode) {
   });
   $("#pages").classList.toggle("tr-overlay", mode === "overlay");
   $("#pages").classList.toggle("tr-side", mode === "side");
+  S.pages.forEach((_, i) => drawHighlights(i));  // 頁邊標籤的位置跟著並排與否換邊
   if (mode === "off") { S.trQueue = []; return; }
   if (mode === "side") {
     // 兩頁並排放不下就自動縮小到剛好塞滿閱讀區寬度
-    const w = Math.max(...S.paper.page_sizes.map(([pw]) => pw)), room = $("#viewer").clientWidth - 48;
+    const w = Math.max(...S.paper.page_sizes.map(([pw]) => pw)), room = $("#viewer").clientWidth - 48 - (wideView.matches ? 80 : 0);  // 80 = 左側標籤留白 --mgut
     if (w * S.scale * 2 + 14 > room) {
       const cur = S.current;
       S.scale = Math.max(0.5, +((room - 14) / (2 * w)).toFixed(2));

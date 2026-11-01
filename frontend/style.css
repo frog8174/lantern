@@ -240,6 +240,23 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
 /* 放在頁面本身的白色邊界裡（論文頁邊通常有 1 吋留白），不會被閱讀區切掉 */
 .mlabel.left { left: 1.2%; } .mlabel.right { right: 1.2%; }
 .mlabel.novelty { color: var(--novelty); } .mlabel.method { color: var(--method); } .mlabel.result { color: var(--result); }
+/* 寬螢幕：標籤是夾在紙外留白的小紙條，引線箭頭指回原文；--mgut 是留給它們的寬度 */
+@media (min-width: 900px) {
+  #pages { --mgut: 80px; }
+  .prow { padding-inline: var(--mgut); }
+  #pages.tr-side .prow { padding-right: 0; }  /* 並排時標籤只放左邊 */
+}
+.mlabel.out { top: 0; transform: translateY(-50%); line-height: 20px; pointer-events: auto; cursor: pointer;
+  font-family: var(--font-tool); background: var(--sheet); border: none; border-bottom: 1px solid; border-radius: var(--radius-sheet);
+  box-shadow: var(--shadow-page); }
+.mlabel.out.left { left: auto; right: calc(100% + 28px); } .mlabel.out.right { left: calc(100% + 28px); right: auto; }
+.mlabel.out:hover { outline: 1px solid; outline-offset: 1px; }
+.mlead { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.mlead path { fill: none; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; opacity: .75; }
+.mlead path.novelty { stroke: var(--novelty); } .mlead path.method { stroke: var(--method); } .mlead path.result { stroke: var(--result); }
+.mlead path.hot { stroke-width: 1.6; opacity: 1; }
+.page .hl.hot.novelty { box-shadow: 0 0 0 1.5px var(--novelty); } .page .hl.hot.method { box-shadow: 0 0 0 1.5px var(--method); }
+.page .hl.hot.result { box-shadow: 0 0 0 1.5px var(--result); }
 .cmark { position: absolute; pointer-events: auto; padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--rule-strong);
   background: var(--panel); color: var(--ink-2); line-height: 0; }
 .cmark:hover { background: var(--leaf); }
