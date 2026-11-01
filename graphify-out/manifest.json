@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793508007.183909,
-    "seen": 1793508122.3490672,
-    "ast_hash": "2ffe5c9cf7c2aad73180f9c5a629d3da",
+    "mtime": 1793512146.022002,
+    "seen": 1793512165.5138657,
+    "ast_hash": "1414a9c432edbe3c801c3de562ee538e",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -121,9 +121,9 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793506909.3123143,
-    "seen": 1793507079.7784503,
-    "ast_hash": "83ecf95e6dd26d901658e35dd4d6b7bc",
+    "mtime": 1793512146.023002,
+    "seen": 1793512165.5138657,
+    "ast_hash": "8104b9a6ef8fabf4aaf8ad40993208fe",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
@@ -343,9 +343,9 @@
     "semantic_hash": ""
   },
   "docs/notes-design.md": {
-    "mtime": 1793506909.3103142,
-    "seen": 1793507079.7784503,
-    "ast_hash": "8b6626eb7c142c59d53c9d47f5a9dee4",
+    "mtime": 1793512146.0210025,
+    "seen": 1793512165.5138657,
+    "ast_hash": "19f747202d0e6ff8518bc174a2464ebd",
     "semantic_hash": ""
   },
   "docs/reader.md": {
@@ -358,6 +358,54 @@
     "mtime": 1793506909.3133142,
     "seen": 1793507079.7784503,
     "ast_hash": "2d1c116b67bc44c1a785b5a82faf2f34",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/check_labse.py": {
+    "mtime": 1793509111.743018,
+    "seen": 1793512165.5138657,
+    "ast_hash": "9583047b2f81d7f6e2d31ff0e7377b55",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/deployment.yaml": {
+    "mtime": 1793510499.6390297,
+    "seen": 1793512165.5138657,
+    "ast_hash": "3907ff5fb6db94a8ae91ba20afa74e5e",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/ingress.yaml": {
+    "mtime": 1793509084.7826252,
+    "seen": 1793512165.5138657,
+    "ast_hash": "fcfdb3c753010595879ed8081411ddfa",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/kustomization.yaml": {
+    "mtime": 1793509282.362849,
+    "seen": 1793512165.5138657,
+    "ast_hash": "53df412d10e3dd6602920926b745c093",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/namespace.yaml": {
+    "mtime": 1793509289.5883849,
+    "seen": 1793512165.5138657,
+    "ast_hash": "17bd9a280775d60164cd9c3bf7d7799e",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/pvc.yaml": {
+    "mtime": 1793509084.7153234,
+    "seen": 1793512165.5138657,
+    "ast_hash": "2cfed1fe10881c6d3395b6ff40674b5e",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-labse/service.yaml": {
+    "mtime": 1793509084.7610433,
+    "seen": 1793512165.5138657,
+    "ast_hash": "05c5d3ec6bd6fc266c348b252dea44b3",
+    "semantic_hash": ""
+  },
+  "docs/labse.md": {
+    "mtime": 1793510230.6298702,
+    "seen": 1793512165.5138657,
+    "ast_hash": "d03f84f606f38ad65eb6212a12ce0cdc",
     "semantic_hash": ""
   }
 }
