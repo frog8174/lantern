@@ -48,8 +48,9 @@ spec:
             periodSeconds: 20
             failureThreshold: 3
           resources:
-            requests: { cpu: 250m, memory: 512Mi }
-            limits: { memory: 2Gi }   # PyMuPDF 解析／算圖大 PDF 時會吃記憶體
+            # 和叢集上實際部署的一致：不設 CPU request；記憶體 request = limit（PyMuPDF 解析／算圖大 PDF 時會吃記憶體）
+            requests: { memory: 10Gi }
+            limits: { memory: 10Gi }
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: lantern-data }

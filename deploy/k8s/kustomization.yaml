@@ -11,5 +11,5 @@ resources:
   - ingress.yaml
 images:
   - name: lantern
-    newName: REGISTRY/lantern        # TODO: 你的映像倉庫，例如 harbor.example.tw/toolmen/lantern
+    newName: harbor.toolmen.bime.ntu.edu.tw/application/lantern
     newTag: "0.1.0"
