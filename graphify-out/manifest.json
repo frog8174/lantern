@@ -13,21 +13,21 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/config.py": {
-    "mtime": 1793504294.4891126,
-    "seen": 1793504435.014687,
-    "ast_hash": "0ee4c04f8e756e966731b2af1b6aaf08",
+    "mtime": 1793506259.327845,
+    "seen": 1793506289.36852,
+    "ast_hash": "5a109939fd015f456bdd76c42dc1d0e8",
     "semantic_hash": ""
   },
   "backend/db.py": {
-    "mtime": 1793465055.2962658,
-    "seen": 1793465182.0126388,
-    "ast_hash": "c4b51983d258ba456ba9e3825ae97e3a",
+    "mtime": 1793506259.3288503,
+    "seen": 1793506289.36852,
+    "ast_hash": "e8877ee38180032c1558e9a36a0106c1",
     "semantic_hash": ""
   },
   "backend/features.py": {
-    "mtime": 1793448992.8130853,
-    "seen": 1793463620.6364586,
-    "ast_hash": "766de0c2e8ac092e4f455f56e918bb03",
+    "mtime": 1793506259.3288503,
+    "seen": 1793506289.36852,
+    "ast_hash": "d1f1fb3d605f7ad2943ab1286471dcd9",
     "semantic_hash": ""
   },
   "backend/llm.py": {
@@ -37,9 +37,9 @@
     "semantic_hash": ""
   },
   "backend/main.py": {
-    "mtime": 1793504294.4891126,
-    "seen": 1793504435.014687,
-    "ast_hash": "62cef0a8a5d37cfd08763e29b5c74d3e",
+    "mtime": 1793506259.3298497,
+    "seen": 1793506289.36852,
+    "ast_hash": "99d923115a476c5cb4d3bdfdeaf83c9b",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793504354.5794256,
-    "seen": 1793504435.014687,
-    "ast_hash": "a3c3e2fc7b93d01d3af82b1ac0dbf8da",
+    "mtime": 1793506272.1336353,
+    "seen": 1793506289.36852,
+    "ast_hash": "a66a52182d3665f802c1cf332dbe97a3",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -115,9 +115,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1793372918.5940893,
-    "seen": 1793463620.6364586,
-    "ast_hash": "580af202fd8352fd7fba58091870abbc",
+    "mtime": 1793506259.3271801,
+    "seen": 1793506289.36852,
+    "ast_hash": "2518d47b89b6febf38da5f13c660695c",
     "semantic_hash": ""
   },
   "frontend/index.html": {
@@ -175,9 +175,9 @@
     "semantic_hash": ""
   },
   "docs/design.md": {
-    "mtime": 1793504431.5397894,
-    "seen": 1793504435.014687,
-    "ast_hash": "7ab750ebd522e34f627ee618d3bd1f98",
+    "mtime": 1793505934.9119477,
+    "seen": 1793506289.36852,
+    "ast_hash": "8e13f2fc9ef92443e984cf4b24e3f341",
     "semantic_hash": ""
   },
   "docs/ux-round1.md": {
@@ -334,6 +334,24 @@
     "mtime": 1793504232.4415467,
     "seen": 1793504435.014687,
     "ast_hash": "b786ffb5efe7571f4d10308b80914707",
+    "semantic_hash": ""
+  },
+  "tests/test_align.py": {
+    "mtime": 1793506259.3318505,
+    "seen": 1793506289.36852,
+    "ast_hash": "eda426f01f337be3a5961f602e207aa9",
+    "semantic_hash": ""
+  },
+  "docs/notes-design.md": {
+    "mtime": 1793505954.360338,
+    "seen": 1793506289.36852,
+    "ast_hash": "0bd0db67dcd02f6ec0fd56240a9bf98c",
+    "semantic_hash": ""
+  },
+  "docs/reader.md": {
+    "mtime": 1793506259.3298497,
+    "seen": 1793506289.36852,
+    "ast_hash": "e58f5e860e466fb1b3e35dd6648b6af0",
     "semantic_hash": ""
   }
 }

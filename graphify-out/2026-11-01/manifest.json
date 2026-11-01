@@ -13,9 +13,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/config.py": {
-    "mtime": 1793465054.4324062,
-    "seen": 1793465182.0126388,
-    "ast_hash": "fcd3cabce01263c49d260e0352775414",
+    "mtime": 1793504294.4891126,
+    "seen": 1793504435.014687,
+    "ast_hash": "0ee4c04f8e756e966731b2af1b6aaf08",
     "semantic_hash": ""
   },
   "backend/db.py": {
@@ -37,9 +37,9 @@
     "semantic_hash": ""
   },
   "backend/main.py": {
-    "mtime": 1793465085.2499454,
-    "seen": 1793465182.0126388,
-    "ast_hash": "ab5891f2b81eda525081ee40f594ec5a",
+    "mtime": 1793504294.4891126,
+    "seen": 1793504435.014687,
+    "ast_hash": "62cef0a8a5d37cfd08763e29b5c74d3e",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793465101.618779,
-    "seen": 1793465182.0126388,
-    "ast_hash": "15c65b473fdbed013509df4d29bfc19e",
+    "mtime": 1793504354.5794256,
+    "seen": 1793504435.014687,
+    "ast_hash": "a3c3e2fc7b93d01d3af82b1ac0dbf8da",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -121,9 +121,9 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793463579.2581317,
-    "seen": 1793463620.6364586,
-    "ast_hash": "28e08eefe260d0fb5cc579e5d1b3a98c",
+    "mtime": 1793504308.113859,
+    "seen": 1793504435.014687,
+    "ast_hash": "7b932437745421bf5f11c50dcf31869e",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
@@ -175,9 +175,9 @@
     "semantic_hash": ""
   },
   "docs/design.md": {
-    "mtime": 1793463579.2561376,
-    "seen": 1793463620.6364586,
-    "ast_hash": "a99fc2df577b3f96809eb167d34898da",
+    "mtime": 1793504431.5397894,
+    "seen": 1793504435.014687,
+    "ast_hash": "7ab750ebd522e34f627ee618d3bd1f98",
     "semantic_hash": ""
   },
   "docs/ux-round1.md": {
@@ -259,9 +259,81 @@
     "semantic_hash": ""
   },
   "tests/test_auth.py": {
-    "mtime": 1793465121.3654625,
-    "seen": 1793465182.0126388,
-    "ast_hash": "70c612267f747d7b262772f2f35e21ae",
+    "mtime": 1793504294.4972014,
+    "seen": 1793504435.014687,
+    "ast_hash": "c0609d3bbd965ccba62f9b3696029578",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/configmap.yaml": {
+    "mtime": 1793469672.2701602,
+    "seen": 1793504435.014687,
+    "ast_hash": "55ea851ebc004f687ba9de85c0434071",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/deployment.yaml": {
+    "mtime": 1793466666.3029027,
+    "seen": 1793504435.014687,
+    "ast_hash": "35299c5858a6a2fcbbe4219741a533c9",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/ingress.yaml": {
+    "mtime": 1793469673.033846,
+    "seen": 1793504435.014687,
+    "ast_hash": "f0f2cf60d7c14a51b9cd819bbf9bc748",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/kustomization.yaml": {
+    "mtime": 1793466664.6252828,
+    "seen": 1793504435.014687,
+    "ast_hash": "4187b79f7031bf3f9d5bb49450a7eb0e",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/namespace.yaml": {
+    "mtime": 1793466665.1312342,
+    "seen": 1793504435.014687,
+    "ast_hash": "6d1eeace7e795b4d4941845b6c07fd22",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/pvc.yaml": {
+    "mtime": 1793469672.6552906,
+    "seen": 1793504435.014687,
+    "ast_hash": "dad7e1eec694ffdb1d59f6449dc8548b",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/service.yaml": {
+    "mtime": 1793466666.671119,
+    "seen": 1793504435.014687,
+    "ast_hash": "2f29111733ad8abe1f6d52572a76010d",
+    "semantic_hash": ""
+  },
+  "docs/deploy.md": {
+    "mtime": 1793470127.3859105,
+    "seen": 1793504435.014687,
+    "ast_hash": "bcb69671fdf5249ee2d152ad0c5044d2",
+    "semantic_hash": ""
+  },
+  "frontend/img/lantern/frame.png": {
+    "mtime": 1793504267.400758,
+    "seen": 1793504435.014687,
+    "ast_hash": "08155616c5d64a95d18a5914e70b91c3",
+    "semantic_hash": ""
+  },
+  "frontend/img/lantern/light.png": {
+    "mtime": 1793504267.4194477,
+    "seen": 1793504435.014687,
+    "ast_hash": "5fed3864d96f6731e39752b5605ad8d5",
+    "semantic_hash": ""
+  },
+  "frontend/img/logo.svg": {
+    "mtime": 1793504249.1253116,
+    "seen": 1793504435.014687,
+    "ast_hash": "d5a03091fc5c78e30216a24b9c725a72",
+    "semantic_hash": ""
+  },
+  "frontend/img/sisyphus/rest_edge.png": {
+    "mtime": 1793504232.4415467,
+    "seen": 1793504435.014687,
+    "ast_hash": "b786ffb5efe7571f4d10308b80914707",
     "semantic_hash": ""
   }
 }
