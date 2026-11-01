@@ -19,6 +19,8 @@ API 一覽（前端 app.js 會呼叫）：
   PATCH  /api/papers/{id}                標籤、備註、星號
   GET    /api/papers/{id}/cite           複製引用（APA/IEEE/MLA/BibTeX）
   GET/POST/PATCH/DELETE .../annotations  螢光筆與註解
+  GET/PUT /api/papers/{id}/note          我的論文筆記（每人每篇一份；PUT 帶 base_updated，過期回 409）
+  POST   /api/papers/{id}/note/draft     AI 從標註擬筆記初稿（SSE，不寫入資料庫）
   /api/auth/*、/api/me、/api/workspaces…  測試登入與 workspace（見 docs/workspaces.md）
 
 SSE（Server-Sent Events）：伺服器用一條 HTTP 連線持續推送 "data: ...\n\n"，
@@ -40,7 +42,7 @@ from urllib.parse import urlencode
 import httpx
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
@@ -283,7 +285,7 @@ def _public(p: dict) -> dict:
             "page_sizes": m["page_sizes"], "outline": m["outline"], "abstract": m["abstract"],
             "references": len(m["references"]), "full_text_fits": features.full_text_fits(p),
             "scanned_pages": m.get("scanned_pages", []), "ocr_pages": m.get("ocr_pages", []),
-            "tags": p.get("tags", [])}
+            "tags": p.get("tags", []), "note": p.get("note") or ""}  # note：論文卡備註，筆記分頁頂端唯讀顯示
 
 
 # ---------------- 論文 ----------------
@@ -833,6 +835,35 @@ def remove_annotation(aid: str, uid: Uid):
     _own_annotation(aid, uid)
     db.delete_annotation(aid)
     return {"ok": True}
+
+
+# ---------------- 論文筆記（docs/notes-design.md）----------------
+# 筆記是私人的：不餵給 Wiki、問答
+class NoteIn(BaseModel):
+    markdown: str = Field(max_length=1_000_000)
+    base_updated: float | None = None  # 前端上次讀到／存到的 updated；還沒有筆記 = null
+
+
+@app.get("/api/papers/{pid}/note")
+def get_note(pid: str, uid: Uid):
+    _paper_or_404(pid, uid)
+    return db.get_note(uid, pid) or {"markdown": "", "updated": None}
+
+
+@app.put("/api/papers/{pid}/note")
+def put_note(pid: str, uid: Uid, body: NoteIn):
+    _paper_or_404(pid, uid)
+    ok, out = db.save_note(uid, pid, body.markdown, body.base_updated)
+    return out if ok else JSONResponse(out, status_code=409)  # 另一個分頁先存了：回伺服器那份讓前端處理
+
+
+@app.post("/api/papers/{pid}/note/draft")
+async def note_draft(pid: str, uid: Uid):
+    p = _paper_or_404(pid, uid) | {"id": pid}
+    msgs = features.note_draft_messages(p, db.list_annotations(pid), db.cache_get(pid, "summary"))
+    if not msgs:
+        return sse(_cached_text("這篇還沒有標註。先用螢光筆（H）畫幾處重點、寫幾句備註，再請 AI 擬稿。"))
+    return sse(llm.stream_chat(msgs, task="note", max_tokens=3000))
 
 
 # ---------------- Workspace ----------------

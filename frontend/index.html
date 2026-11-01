@@ -202,7 +202,8 @@
       <button id="panelDock" class="link small" title="放回右側">停靠</button></div>
     <nav class="tabs" role="tablist" aria-label="面板分頁">
       <button role="tab" data-tab="read" class="on" aria-selected="true" aria-controls="tab-read">讀懂</button>
-      <button role="tab" data-tab="notes" aria-selected="false" aria-controls="tab-notes">我的筆記</button>
+      <button role="tab" data-tab="notes" aria-selected="false" aria-controls="tab-notes">標註</button>
+      <button role="tab" data-tab="notebook" aria-selected="false" aria-controls="tab-notebook">筆記</button>
       <button role="tab" data-tab="refs" aria-selected="false" aria-controls="tab-refs">文獻</button>
       <button role="tab" data-tab="wiki" aria-selected="false" aria-controls="tab-wiki">Wiki</button>
       <button id="panelFloat" class="icon pfloat" title="彈出成浮動視窗（可拖曳、可調整大小）" aria-label="彈出成浮動視窗"><svg aria-hidden="true"><use href="#i-popout"/></svg></button>
@@ -224,7 +225,7 @@
       </form>
     </div>
 
-    <!-- 我的筆記：螢光筆、自動標註、註解 -->
+    <!-- 標註：螢光筆、自動標註、註解（內部 key 仍是 notes） -->
     <div class="tab" id="tab-notes" role="tabpanel">
       <div class="filters">
         <div class="frow"><span class="small muted">顏色</span><span id="colorFilter" class="swatches"></span></div>
@@ -239,6 +240,29 @@
         <section class="psec"><h3>螢光筆與自動標註</h3><ul id="notesList" class="notes"></ul></section>
         <section class="psec"><h3>註解</h3><ul id="commentList" class="notes"></ul></section>
       </div>
+    </div>
+
+    <!-- 筆記：這篇論文的一份 Markdown 筆記（docs/notes-design.md），自動儲存、私人 -->
+    <div class="tab" id="tab-notebook" role="tabpanel">
+      <div class="nbbar">
+        <div class="seg" id="nbMode" role="group" aria-label="編輯或預覽">
+          <button data-m="edit" class="on" aria-pressed="true">編輯</button><button data-m="preview" aria-pressed="false">預覽</button></div>
+        <button id="nbDraft" class="small" title="依這篇的標註、備註與 AI 解釋擬一份初稿，按「插入」才會放進筆記">AI 擬初稿</button>
+        <span class="nbmore"><button id="nbExport" class="link small">匯出 .md</button><button id="nbPrint" class="link small">列印</button></span>
+      </div>
+      <div class="feed nbfeed">
+        <p id="nbCardNote" class="nbcard small" hidden></p>
+        <div id="nbMsg" class="nbmsg small" role="alert" hidden></div>
+        <section id="nbDraftBox" class="nbdraft" hidden>
+          <div class="row"><b class="small">AI 草稿（還沒放進筆記）</b>
+            <span><button id="nbInsert" class="small" disabled>插入</button><button id="nbDraftClose" class="link small">關閉</button></span></div>
+          <div id="nbDraftOut" class="md"></div>
+        </section>
+        <textarea id="nbText" class="nbtext" aria-label="這篇論文的筆記（Markdown）" spellcheck="false"
+          placeholder="寫下你對這篇的想法…支援 Markdown 與 $公式$。&#10;在 PDF 選字按「引用」（Q），或在「標註」分頁按「引用」，會把原文和可點回的連結放進來。"></textarea>
+        <div id="nbPreview" class="nbpreview" hidden></div>
+      </div>
+      <div id="nbStatus" class="nbstatus small muted" role="status"></div>
     </div>
 
     <!-- 文獻：參考文獻、相關論文 -->
@@ -273,6 +297,7 @@
     <span class="palette" id="palette"></span>
   </span>
   <button data-act="comment" title="寫註解（C）">寫註解</button>
+  <button data-act="quote" title="引用到筆記（Q）">引用</button>
   <button data-act="ask" title="針對選取的段落提問">問 AI</button>
   <input id="askInput" placeholder="想問什麼？Enter 送出" aria-label="針對選取段落提問" hidden>
 </div>
@@ -289,6 +314,7 @@
   <button data-act="comment"><svg><use href="#i-comment"/></svg>寫註解</button>
   <button data-act="explain"><svg><use href="#i-explain"/></svg>解釋</button>
   <button data-act="highlight"><svg><use href="#i-pen"/></svg>畫重點</button>
+  <button data-act="quote"><svg><use href="#i-quote"/></svg>引用到筆記</button>
   <button data-act="copy"><svg><use href="#i-copy"/></svg>複製</button>
 </div>
 
@@ -312,7 +338,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <!-- 背景工作完成的小提示（toast()）；連不上伺服器的常駐提示（reach()） -->
 <div id="toast" class="toast" role="status" hidden></div>
-<div id="offline" class="toast offline" role="alert" hidden><span class="sis sis-rest" style="--sz:64px" aria-hidden="true"><i class="f"></i></span><span>連不上伺服器。檢查伺服器是否還在跑，然後重新整理。</span></div>
+<div id="nbPrintArea" class="md"></div><!-- 「列印」筆記時只印這塊（style.css 的 @media print） -->
+<div id="offline"class="toast offline" role="alert" hidden><span class="sis sis-rest" style="--sz:64px" aria-hidden="true"><i class="f"></i></span><span>連不上伺服器。檢查伺服器是否還在跑，然後重新整理。</span></div>
 <script src="app.js"></script>
 </body>
 </html>

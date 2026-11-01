@@ -17,7 +17,8 @@
 | 相關論文（Scholar Deep Search） | 「相關」分頁：依本篇或整個論文庫推薦，arXiv 論文一鍵匯入 | `features.recommend` |
 | AI 大綱（Document Outlining） | 先讀 PDF 內建書籤，沒有就用字級猜，還不行按「AI 生成」 | `pdf_parse._outline`、`features.ai_outline` |
 | 論文庫 | 標籤、篩選、全文搜尋（Enter，跨所有論文、點結果跳頁） | `db.search_chunks` |
-| 螢光筆、註解 | SQLite 存 | `db.py` |
+| 螢光筆、註解 | SQLite 存；閱讀頁「標註」分頁列出全部 | `db.py` |
+| 論文筆記 | 閱讀頁「筆記」分頁：每篇一份 Markdown 筆記，編輯／預覽、自動儲存、標註一鍵引用（可點回原處）、AI 從標註擬初稿、匯出 .md、列印 | `db.save_note`、`features.note_draft_messages`、`app.js` 筆記段 |
 | 摘要 | 結構化 Markdown，存快取 | `features.summary_messages` |
 | 掃描版 PDF | 自動偵測沒文字層的頁 → 畫成圖丟 OCR 模型 → 文字給聊天 / 摘要 / 檢索用 | `pdf_parse._is_scanned`、`llm.ocr_image` |
 
@@ -30,6 +31,7 @@
 | 螢光筆 | 選字 → 筆的圖示（或按 **H**）；滑過筆的圖示可選 5 種顏色 |
 | 翻譯一段 | 選字 → 地球圖示（或按 **T**） |
 | 加註解 | 選字 → 按右鍵 →「加註解」（或按 **C**）；頁邊會出現註解圖示 |
+| 寫筆記、引用原文 | 右側「筆記」分頁直接寫（Markdown，自動儲存）；選字按「引用」（或按 **Q**），或在「標註」分頁某則按「引用」，原文和可點回原處的連結會插進筆記 |
 | 解釋圖表 / 公式 | 按住 **Ctrl / ⌘** 拖曳框選（或先按頂部「框選」），框旁的工具列按解釋或直接輸入問題 |
 | 整頁翻譯 | 頂部「原文 / 疊加 / 並排」：疊加 = 譯文蓋在原文位置；並排 = 原文頁和譯文頁左右對照，圖表原樣保留 |
 | 看圖表 | 滑鼠移到正文的「Figure 3」「Table 2」上 |
@@ -134,6 +136,7 @@ curl http://localhost:8000/v1/models     # 回傳的 "id" 就是 LLM_MODEL
 | AI 大綱 | `LLM_MODEL_OUTLINE` | Haiku 5.5 | low（預設） | 簡單的 JSON 整理 |
 | 聊天建議問題 | `LLM_MODEL_SUGGEST` | Haiku 5.5 | low（預設） | 三個短問題，每篇只跑一次 |
 | 中英對齊（螢光筆同步到譯文） | `LLM_MODEL_ALIGN` | 沒設就同翻譯 | low（預設） | 只要從一段裡抄出對應的子字串（docs/reader.md） |
+| 筆記 AI 擬初稿 | `LLM_MODEL_NOTE` | Sonnet 5.5 | medium | 依你的標註與備註組織成筆記，要照抄引用標記（docs/notes-design.md） |
 
 - 翻譯品質不滿意就把 `LLM_MODEL_TRANSLATE` 換成 `anthropic:claude-sonnet-5-5`；要省錢就把聊天、摘要也降到 Sonnet 5.5。
 - 改完打開 `/api/health`：`tasks` 列出每個元件實際用的模型，另外指定的模型也會各測一次連線。
