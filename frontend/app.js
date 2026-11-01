@@ -15,6 +15,27 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
+/** 提問框：Enter 送出；Shift+Enter（瀏覽器預設）和 Ctrl+Enter 換行。
+ *  take=true：自己取出文字、清空再 send(q)；false：交給表單的 submit 處理。 */
+function onAskKey(el, send, take = true) {
+  // 浮動工具列（.pill）裡的框往下長高時，整條往上挪，別超出視窗底
+  const fit = () => {
+    const p = el.closest(".pill"), r = p?.getBoundingClientRect();
+    if (r && r.bottom > innerHeight - 8) p.style.top = `${Math.max(8, innerHeight - 8 - r.height)}px`;
+  };
+  el.addEventListener("input", fit);
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.shiftKey) return;
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) return el.setRangeText("\n", el.selectionStart, el.selectionEnd, "end"), fit();
+    if (!take) return send();
+    const q = el.value.trim();
+    if (!q) return;
+    el.value = "";
+    send(q);
+  });
+}
+
 const COLORS = ["yellow", "green", "blue", "pink", "purple"];
 // 自訂色：存成 #rrggbb；篩選時歸在 "custom" 這一類
 const isHex = (c) => /^#[0-9a-f]{6}$/i.test(c || "");
@@ -917,12 +938,7 @@ selBar.addEventListener("click", (e) => {
   }
   if (b) selAction(b.dataset.act);
 });
-$("#askInput").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter" || e.isComposing || !e.target.value.trim()) return;
-  const q = e.target.value.trim();
-  e.target.value = "";
-  selAction("ask", q);
-});
+onAskKey($("#askInput"), (q) => selAction("ask", q));
 
 async function selAction(act, question = "") {
   const sel = lastSel;
@@ -1062,7 +1078,7 @@ async function aiCard({ title, anchor, quote = "", url, body, method = "POST", q
   const out = document.createElement("div");
   out.className = "ans";
   bodyEl.appendChild(out);
-  if (prior) { renderMD(out, prior); $("input", $(".afollow", card)).focus(); return; }
+  if (prior) { renderMD(out, prior); $("textarea", $(".afollow", card)).focus(); return; }
   const full = await streamInto(out, url, body, method);
   if (job !== cardJob) return;
   // 回答第一行若是「## 標題」，拿來當卡片標題（Moonlight 的 "Understanding …"）
@@ -1076,9 +1092,10 @@ async function aiCard({ title, anchor, quote = "", url, body, method = "POST", q
   }
 }
 
+onAskKey($(".afollow textarea", card), () => $(".afollow", card).requestSubmit(), false);
 $(".afollow", card).addEventListener("submit", async (e) => {
   e.preventDefault();
-  const input = $("input", e.target), q = input.value.trim();
+  const input = $("textarea", e.target), q = input.value.trim();
   if (!q || !card.followup) return;
   input.value = "";
   const job = cardJob;
@@ -1376,7 +1393,7 @@ function setCropping(on) {
 function clearCrop() { cropDone?.box.remove(); cropDone = null; $("#cropBar").hidden = true; }
 $("#btnCrop").onclick = () => setCropping(!S.cropping);
 $("#pages").addEventListener("mousedown", (e) => {
-  const pageEl = e.target.closest(".page");
+  const pageEl = e.target.closest(".page, .twin");  // 譯文頁和原文頁同尺寸，框的位置直接對應
   if (!pageEl || e.button !== 0 || !(S.cropping || e.shiftKey || e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   clearCrop();
@@ -1418,9 +1435,7 @@ $("#cropBar").addEventListener("click", (e) => {
   if (act === "close") clearCrop();
   if (act === "explain") explainCrop("");
 });
-$("#cropAsk").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.isComposing && e.target.value.trim()) { explainCrop(e.target.value.trim()); e.target.value = ""; }
-});
+onAskKey($("#cropAsk"), explainCrop);
 
 function explainCrop(question) {
   if (!cropDone) return;
@@ -2421,9 +2436,7 @@ $("#chatForm").onsubmit = (e) => {
   $("#chatInput").value = "";
   sendChat(q);
 };
-$("#chatInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); }
-});
+onAskKey($("#chatInput"), () => $("#chatForm").requestSubmit(), false);
 // 不用 confirm()：第一下只是「上膛」，三秒內再按一次才真的清除
 $("#chatClear").onclick = async (e) => {
   const b = e.currentTarget;
@@ -2920,9 +2933,7 @@ $("#qaForm").onsubmit = (e) => {
   $("#qaInput").value = "";
   sendAsk(q);
 };
-$("#qaInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#qaForm").requestSubmit(); }
-});
+onAskKey($("#qaInput"), () => $("#qaForm").requestSubmit(), false);
 $("#askClear").onclick = async (e) => {
   if (!armDelete(e.currentTarget)) return;
   await api(`/api/workspaces/${curWs.id}/ask`, { method: "DELETE" });

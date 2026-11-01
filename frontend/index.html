@@ -133,7 +133,7 @@
     <div class="ahead"><p class="muted">回答會先查這個研究主題的 Wiki，每個說法都標著出處。</p><button id="askClear" class="link small">清空對話</button></div>
     <div id="askOut"></div>
     <form id="qaForm" class="chatbox askbox">
-      <textarea id="qaInput" rows="2" aria-label="問這個研究主題的 Wiki" placeholder="問一個跨論文的問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+      <textarea id="qaInput" rows="2" aria-label="問這個研究主題的 Wiki" placeholder="問一個跨論文的問題…（Enter 送出，Shift／Ctrl+Enter 換行）"></textarea>
       <button class="icon send" title="送出" aria-label="送出"><svg><use href="#i-send"/></svg></button>
     </form>
   </div>
@@ -229,7 +229,7 @@
           <div id="chatOut"></div></section>
       </div>
       <form id="chatForm" class="chatbox">
-        <textarea id="chatInput" rows="2" aria-label="問這篇論文" placeholder="問這篇論文任何問題…（Enter 送出，Shift+Enter 換行）"></textarea>
+        <textarea id="chatInput" rows="2" aria-label="問這篇論文" placeholder="問這篇論文任何問題…（Enter 送出，Shift／Ctrl+Enter 換行）"></textarea>
         <button class="icon send" title="送出" aria-label="送出"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
       </form>
     </div>
@@ -336,13 +336,13 @@
   <button data-act="comment" title="寫註解（C）">寫註解</button>
   <button data-act="quote" title="引用到筆記（Q）">引用</button>
   <button data-act="ask" title="針對選取的段落提問">問 AI</button>
-  <input id="askInput" placeholder="想問什麼？Enter 送出" aria-label="針對選取段落提問" hidden>
+  <textarea id="askInput" rows="1" placeholder="想問什麼？Enter 送出" title="Enter 送出，Shift+Enter 或 Ctrl+Enter 換行" aria-label="針對選取段落提問" hidden></textarea>
 </div>
 
 <!-- 框選區域後浮出的工具列 -->
 <div id="cropBar" class="pill" hidden>
   <button data-act="explain" title="解釋這個區域"><svg><use href="#i-explain"/></svg></button>
-  <input id="cropAsk" placeholder="問這張圖 …" aria-label="針對框選區域提問">
+  <textarea id="cropAsk" rows="1" placeholder="問這張圖 …" title="Enter 送出，Shift+Enter 或 Ctrl+Enter 換行" aria-label="針對框選區域提問"></textarea>
   <button data-act="close" title="取消"><svg><use href="#i-close"/></svg></button>
 </div>
 
@@ -361,7 +361,7 @@
     <button class="icon" data-k="copy" title="複製"><svg><use href="#i-copy"/></svg></button>
     <button class="icon" data-k="close" title="關閉（Esc）"><svg><use href="#i-close"/></svg></button></div>
   <div class="abody"></div>
-  <form class="afollow"><input placeholder="繼續問 …" aria-label="追問"><button class="icon" title="送出"><svg><use href="#i-send"/></svg></button></form>
+  <form class="afollow"><textarea rows="1" placeholder="繼續問 …" title="Enter 送出，Shift+Enter 或 Ctrl+Enter 換行" aria-label="追問"></textarea><button class="icon" title="送出"><svg><use href="#i-send"/></svg></button></form>
 </div>
 
 <div id="citeCard" class="citecard" hidden></div>
