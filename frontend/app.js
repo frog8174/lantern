@@ -353,7 +353,10 @@ function buildPages() {
   S.pages = [];
   // IntersectionObserver：頁面捲進畫面才畫，100 頁的論文也不會卡
   S.observer = new IntersectionObserver((ents) => {
-    for (const e of ents) if (e.isIntersecting) renderPage(+e.target.dataset.page);
+    for (const e of ents) if (e.isIntersecting) {
+      const i = +e.target.dataset.page;
+      S.pages[i]?.rendered ? refreshCanvas(i) : renderPage(i);  // 縮放過的舊頁圖捲進來才換清晰版
+    }
   }, { root: $("#viewer"), rootMargin: "600px 0px" });
 
   S.paper.page_sizes.forEach(([w, h], i) => {
@@ -405,7 +408,6 @@ async function renderPage(i) {
   pg.canvas = canvas;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport,
                       transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
-  $(".stale", pg.el)?.remove();  // 縮放前的舊頁圖：新的畫好才拿掉
   S.firstPage?.();
 
   const tl = document.createElement("div");
@@ -645,8 +647,9 @@ $("#pageInput").addEventListener("keydown", (e) => {
   e.target.blur();
 });
 
-/** 縮放並重建頁面；at = [clientX, clientY]：縮放後這一點底下仍是同一處內容（預設閱讀區中心）。
- *  重建時先把舊的頁圖拉伸墊在新頁上（.stale），新的畫好才拿掉，不會整片閃白。 */
+/** 縮放；at = [clientX, clientY]：縮放後這一點底下仍是同一處內容（預設閱讀區中心）。
+ *  不重建頁面（重建會讓標註、譯文、頁邊標籤消失一瞬間＝閃一下）：頁框直接改尺寸，
+ *  文字層跟著 --scale-factor、標註與譯文是百分比定位；舊頁圖拉伸頂著，畫面上的頁再換成清晰版。 */
 function zoom(f, at) {
   if (!S.paper) return;
   const v = $("#viewer"), vr = v.getBoundingClientRect();
@@ -654,22 +657,55 @@ function zoom(f, at) {
   // 錨點：游標底下（或最近）的那一頁，以及游標在頁內的比例位置
   const hit = document.elementFromPoint(cx, cy)?.closest(".page, .twin")
     || S.pages.map((p) => p.el).find((el) => el.getBoundingClientRect().bottom > cy);
-  const hr = hit?.getBoundingClientRect(), twin = hit?.classList.contains("twin"), idx = hit ? +hit.dataset.page : -1;
+  const hr = hit?.getBoundingClientRect();
   const fx = hr ? (cx - hr.left) / hr.width : 0, fy = hr ? (cy - hr.top) / hr.height : 0;
-  const old = S.pages.map((p) => [$("canvas", p.el), $("canvas", p.twin)]);  // 還沒重畫好的頁就沿用它的舊圖
+  const s0 = S.scale;
   S.scale = Math.min(3, Math.max(0.5, +(S.scale * f).toFixed(2)));
-  buildPages();
-  old.forEach((cs, i) => [S.pages[i]?.el, S.pages[i]?.twin].forEach((host, k) => {
-    if (host && cs[k]) { cs[k].className = "stale"; cs[k].style.width = cs[k].style.height = ""; host.prepend(cs[k]); }
-  }));
-  if (idx < 0) return;
-  // 新列在瀏覽器判定「在畫面上」之前都被 content-visibility 跳過排版（寬度 0），橫向捲動會被夾回 0；
-  // 錨點那一列固定照常排版（下次重建就換掉，只多排一列）
-  const anchor = twin ? S.pages[idx].twin : S.pages[idx].el;
-  anchor.parentElement.style.contentVisibility = "visible";
-  const nr = anchor.getBoundingClientRect();
-  v.scrollLeft += nr.left + fx * nr.width - cx;
-  v.scrollTop += nr.top + fy * nr.height - cy;
+  if (S.scale === s0) return;
+  clearCrop();  // 框選框是 px 定位，縮放後會錯位
+  const k = S.scale / s0;
+  S.pages.forEach((pg, i) => {
+    const [w, h] = S.paper.page_sizes[i];
+    for (const host of [pg.el, pg.twin]) {
+      Object.assign(host.style, { width: `${w * S.scale}px`, height: `${h * S.scale}px` });
+      $$("canvas", host).forEach((c) => { c.style.width = c.style.height = "100%"; });
+      $$(".trb.done", host).forEach((d) => { d.style.fontSize = `${parseFloat(d.style.fontSize) * k}px`; });
+    }
+    pg.el.parentElement.style.containIntrinsicHeight = `${h * S.scale}px`;
+    pg.el.style.setProperty("--scale-factor", S.scale);
+    if (pg.rendered) { pg.stale = true; drawHighlights(i); }  // 頁邊標籤的引線是 px，要重畫
+  });
+  $("#zoomLabel").textContent = `${Math.round(S.scale * 100)}%`;
+  if (hit) {
+    const nr = hit.getBoundingClientRect();
+    v.scrollLeft += nr.left + fx * nr.width - cx;
+    v.scrollTop += nr.top + fy * nr.height - cy;
+  }
+  drawRail();
+  // 畫面附近的頁現在就換清晰版；其他頁捲進來時（IntersectionObserver）再換
+  const near = v.getBoundingClientRect();
+  S.pages.forEach((pg, i) => {
+    const r = pg.el.getBoundingClientRect();
+    if (pg.stale && r.bottom > near.top - 600 && r.top < near.bottom + 600) refreshCanvas(i);
+  });
+}
+
+/** 已畫過的頁換成目前倍率的清晰頁圖（文字層、標註不動）；畫好才替換，期間舊圖頂著。 */
+async function refreshCanvas(i) {
+  const pg = S.pages[i];
+  if (!pg?.stale || !pg.canvas) return;
+  pg.stale = false;
+  const scale = S.scale, page = await S.pdf.getPage(i + 1);
+  const viewport = page.getViewport({ scale }), dpr = window.devicePixelRatio || 1;
+  const c = document.createElement("canvas");
+  c.width = Math.floor(viewport.width * dpr); c.height = Math.floor(viewport.height * dpr);
+  c.style.width = `${viewport.width}px`; c.style.height = `${viewport.height}px`;
+  await page.render({ canvasContext: c.getContext("2d"), viewport, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+  if (S.scale !== scale || S.pages[i] !== pg) return;  // 畫的時候又縮放或換了論文：交給下一輪
+  pg.canvas.replaceWith(c);
+  pg.canvas = c;
+  const tc = $("canvas", pg.twin);
+  if (tc) { tc.remove(); syncTwin(i); }
 }
 
 /* 平滑縮放：先用 CSS transform 即時放大縮小（便宜），停手後才真正重建頁面。
@@ -1624,13 +1660,12 @@ function setTrMode(mode) {
 /** 並排模式：把原文頁的畫面複製到譯文頁當底圖，圖表、公式原樣保留，文字段落再蓋上譯文。 */
 function syncTwin(i) {
   const pg = S.pages[i];
-  if (!pg?.canvas || $("canvas:not(.stale)", pg.twin)) return;
+  if (!pg?.canvas || $("canvas", pg.twin)) return;
   const c = document.createElement("canvas");
   c.width = pg.canvas.width; c.height = pg.canvas.height;
   c.style.width = pg.canvas.style.width; c.style.height = pg.canvas.style.height;
   c.getContext("2d").drawImage(pg.canvas, 0, 0);
   pg.twin.prepend(c);
-  $(".stale", pg.twin)?.remove();
 }
 
 function queueTranslation(i, first = false) {

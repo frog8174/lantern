@@ -10,7 +10,7 @@
   "8": "fake_api.py",
   "13": "main.py",
   "14": "CLAUDE.md",
-  "15": "backend/__init__.py",
+  "15": "sentalign.py",
   "16": "Workspace LLM Wiki（MVP）",
   "17": "escapeHTML",
   "18": "_pdf_path",
@@ -65,9 +65,15 @@
   "67": "config.py",
   "68": "功能對照",
   "69": "drawOutline",
+  "70": "backend/__init__.py",
+  "71": "test_sentalign.py",
   "72": "json",
   "73": "_ingest",
   "74": "k8s-labse/kustomization.yaml",
   "75": "k8s-labse/namespace.yaml",
-  "76": "LaBSE 句向量服務（中英逐句對齊）"
+  "76": "LaBSE 句向量服務（中英逐句對齊）",
+  "77": "test_workspaces.py",
+  "78": "test_align.py",
+  "79": "test_notes.py",
+  "80": "addMsg"
 }

@@ -256,8 +256,6 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .twin { display: none; }
 #pages.tr-side .twin { display: block; }
 .page canvas, .twin canvas { display: block; }
-/* 縮放後還沒重畫好的頁：舊頁圖拉伸蓋在上面，暫代空白 */
-.page canvas.stale, .twin canvas.stale { position: absolute; inset: 0; width: 100%; height: 100%; }
 .page .hlLayer, .page .cropLayer, .page .selLayer { position: absolute; inset: 0; pointer-events: none; }
 /* 選取中的連續色帶（取代被 span 縫隙切碎的原生選取色）與並排模式對應的原文區塊淡框 */
 .selLayer .sel { position: absolute; background: var(--lamp-fill); mix-blend-mode: multiply; }
