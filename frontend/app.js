@@ -390,6 +390,12 @@ async function renderPage(i) {
   await pdfjsLib.renderTextLayer({
     textContentSource: await page.getTextContent(), container: tl, viewport, textDivs: [],
   }).promise;
+  // PDF.js 檢視器的做法：拖選時一塊墊底的 endOfContent 蓋滿整層，游標落在字與字之間的空白時，
+  // 選取停在最近的字，不會一路跳到頁尾（否則腳註也被選進去）
+  const eoc = document.createElement("div");
+  eoc.className = "endOfContent";
+  tl.appendChild(eoc);
+  tl.addEventListener("mousedown", () => tl.classList.add("selecting"));
   drawHighlights(i);
   if (S.trMode === "side") syncTwin(i);
   if (S.trMode !== "off") S.tr[i] ? drawTranslation(i) : queueTranslation(i);
@@ -449,17 +455,21 @@ function drawLabels(i, layer) {
   for (const s of ["left", "right"]) {
     let floor = -Infinity;
     const items = list.filter((a) => sideOf(a) === s).map((a) => {
-      const [x0, y0, x1, y1] = a.rects[0];
-      return { a, tx: s === "left" ? x0 * W - 3 : x1 * W + 3, ty: (y0 + y1) / 2 * H };
+      const [, y0, , y1] = a.rects[0];  // 指到段落最外緣（所有行最左／最右），高度對齊第一行
+      const edge = s === "left" ? Math.min(...a.rects.map((r) => r[0])) : Math.max(...a.rects.map((r) => r[2]));
+      return { a, tx: s === "left" ? edge * W - 4 : edge * W + 4, ty: (y0 + y1) / 2 * H };
     }).sort((p, q) => p.ty - q.ty);
     for (const { a, tx, ty } of items) {
       const y = floor = Math.max(ty, floor + LH);
       const k = a.kind.slice(5), sx = s === "left" ? -RUN : W + RUN, bx = s === "left" ? -6 : W + 6;
-      const ang = Math.atan2(ty - y, tx - bx), tip = (d) => `${tx - 6 * Math.cos(ang + d)} ${ty - 6 * Math.sin(ang + d)}`;
+      // 無印風：一條細淡線，終點一顆小圓點停在段落邊上，不用箭頭
       const path = document.createElementNS(svg.namespaceURI, "path");
       path.setAttribute("class", k);
-      path.setAttribute("d", `M${sx} ${y}L${bx} ${y}L${tx} ${ty}M${tip(0.45)}L${tx} ${ty}L${tip(-0.45)}`);
-      svg.appendChild(path);
+      path.setAttribute("d", `M${sx} ${y}L${bx} ${y}L${tx} ${ty}`);
+      const dot = document.createElementNS(svg.namespaceURI, "circle");
+      dot.setAttribute("class", k);
+      dot.setAttribute("cx", tx); dot.setAttribute("cy", ty); dot.setAttribute("r", 1.8);
+      svg.append(path, dot);
       const b = document.createElement("button");
       b.className = `mlabel out ${s} ${k}`;
       b.style.top = `${y}px`;
@@ -467,6 +477,7 @@ function drawLabels(i, layer) {
       b.title = "在筆記中查看";
       const hot = (on) => {
         path.classList.toggle("hot", on);
+        dot.classList.toggle("hot", on);
         $$(`.hl[data-id="${a.id}"]`, layer).forEach((d) => d.classList.toggle("hot", on));
       };
       b.onmouseenter = b.onfocus = () => hot(true);
@@ -624,6 +635,14 @@ function setLibDrawer(on) {
   if (on) $("#lib").focus();
 }
 $("#toggleLib").onclick = () => setLibDrawer(!$("main").classList.contains("showlib"));
+// 寬螢幕的左欄：預設滑過才展開；按圖釘固定（記在這台瀏覽器）
+function setLibPin(on) {
+  $("main").classList.toggle("libauto", !on);
+  $("#libPin").setAttribute("aria-pressed", on);
+  try { localStorage.setItem("lantern.libPin", on ? "1" : "0"); } catch {}
+}
+$("#libPin").onclick = () => setLibPin($("main").classList.contains("libauto"));
+setLibPin((() => { try { return localStorage.getItem("lantern.libPin") === "1"; } catch { return false; } })());
 $("#togglePanel").onclick = () => $("main").classList.toggle("nopanel");
 // 手機寬度：面板預設收起，要看時從頂列的面板鈕叫出來
 if (innerWidth < 700) $("main").classList.add("nopanel");
@@ -776,6 +795,7 @@ document.addEventListener("selectionchange", () => {
 });
 
 document.addEventListener("mouseup", (e) => {
+  $$(".textLayer.selecting").forEach((t) => t.classList.remove("selecting"));
   if (e.button !== 0 || selBar.contains(e.target) || S.cropping || crop) return;
   if (!e.target.closest?.("#pages")) return;
   setTimeout(() => {
@@ -1051,7 +1071,7 @@ async function deleteAnnotation(a) {
 }
 
 /** 英文螢光筆 → 問模型譯文裡對應哪一段，存在標註上（之後不再問）。對應到重疊面積最大的翻譯區塊。
- *  shortcut: 只在這頁譯文已經在前端翻完時同步；之後才翻的頁不會補，要補就在翻完時掃一次沒有 align 的標註。 */
+ *  譯文還沒翻完時先跳過；那頁翻完時 pumpTranslation 會再掃一次沒有 align 的螢光筆補上。 */
 async function alignHighlight(a) {
   const blocks = S.tr[a.page];
   if (!blocks?.done) return;
@@ -1416,6 +1436,8 @@ async function pumpTranslation() {
       else { blocks[ev.i].tr = ev.tr; drawTranslation(page, ev.i); }
     });
     if (S.paper?.id === pid && S.tr[page]) { blocks.done = true; drawTranslation(page); }
+    // 翻譯前就畫好的螢光筆，現在補同步到譯文
+    if (S.paper?.id === pid) S.annotations.filter((x) => x.page === page && x.kind === "user" && !x.align).forEach(alignHighlight);
   } catch (e) {
     delete S.tr[page];
     const pg = S.pages[page];

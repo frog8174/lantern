@@ -151,14 +151,37 @@ button.tool.active { color: var(--ink); }
 /* ---- 三欄版面 ---- */
 /* 欄寬跟著視窗走：右欄是拖曳設定的寬度，但最多 55% 視窗寬；
    閱讀區用 minmax(0, 1fr)，PDF 比欄寬時在閱讀區內捲動，不會把整個版面撐開 */
-main { --pw: min(var(--panel-w, 380px), 55vw); display: grid; grid-template-columns: 240px minmax(0, 1fr) var(--pw);
+main { --pw: min(var(--panel-w, 380px), 55vw); --libw: 240px; display: grid; grid-template-columns: var(--libw) minmax(0, 1fr) var(--pw);
   flex: 1; min-height: 0; }
 main.nopanel .panel { display: none; }
 /* 浮動面板：面板離開版面，閱讀區佔滿；面板變成可拖曳、可調整大小的視窗 */
-main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
+main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr); }
 /* 左欄只放「這篇」：大綱，下面是同研究主題的論文 */
 .lib { background: var(--desk); border-right: 1px solid var(--rule); overflow-y: auto; padding: 4px 14px 30px; }
 .lib:focus { outline: none; }
+.lacts { display: inline-flex; align-items: center; gap: 2px; }
+.lpin { width: 30px; height: 30px; min-height: 0; padding: 0; justify-content: center; color: var(--ink-3); border-color: transparent; background: none; }
+.lpin svg { width: 16px; height: 16px; }
+.lpin:hover, .lpin:focus-visible { color: var(--ink); }
+.lpin[aria-pressed="true"] { color: var(--lamp); }
+/* 左欄沒固定時（寬螢幕）：平常只留一條窄邊，滑過或 Tab 進來才展開成浮在閱讀區上的抽屜；
+   展開稍快、收起慢一點，滑鼠稍微掠過不會一直開合 */
+@media (min-width: 900px) {
+  main.libauto { --libw: 16px; }
+  main.libauto .lib { position: relative; z-index: 21; width: 16px; overflow: hidden; padding-inline: 0;
+    transition: width .2s ease .35s, padding .2s ease .35s, box-shadow .2s ease .35s; }
+  /* 只用透明度藏起來（不用 visibility），Tab 才進得來、觸發 :focus-within 展開 */
+  main.libauto .lib > * { opacity: 0; transition: opacity .15s ease .35s; }
+  main.libauto .lib::before { content: ""; position: absolute; top: 50%; left: 6px; width: 3px; height: 44px; translate: 0 -50%;
+    border-inline: 1px solid var(--rule-strong); transition: opacity .15s ease .35s; }
+  main.libauto .lib:is(:hover, :focus-within) { width: 260px; overflow-y: auto; padding-inline: 14px; box-shadow: var(--shadow-float);
+    border-right-color: var(--rule-strong); transition-delay: .06s; }
+  main.libauto .lib:is(:hover, :focus-within) > * { opacity: 1; transition-delay: .1s; }
+  main.libauto .lib:is(:hover, :focus-within)::before { opacity: 0; transition-delay: 0s; }
+}
+@media (min-width: 900px) and (prefers-reduced-motion: reduce) {
+  main.libauto .lib, main.libauto .lib > *, main.libauto .lib::before { transition: none; }
+}
 .lhead { font-weight: 700; font-size: 14px; color: var(--ink-2); margin: 18px 0 8px;
   display: flex; justify-content: space-between; align-items: baseline; }
 .lsib { margin-top: 18px; padding-top: 2px; border-top: 1px solid var(--rule); }
@@ -249,15 +272,20 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
   .prow { padding-inline: var(--mgut); }
   #pages.tr-side .prow { padding-right: 0; }  /* 並排時標籤只放左邊 */
 }
-.mlabel.out { top: 0; transform: translateY(-50%); line-height: 20px; pointer-events: auto; cursor: pointer;
-  font-family: var(--font-tool); background: var(--sheet); border: none; border-bottom: 1px solid; border-radius: var(--radius-sheet);
-  box-shadow: var(--shadow-page); }
-.mlabel.out.left { left: auto; right: calc(100% + 28px); } .mlabel.out.right { left: calc(100% + 28px); right: auto; }
-.mlabel.out:hover { outline: 1px solid; outline-offset: 1px; }
+/* 紙外的標籤：無印風，沒有底、框和陰影；一顆類別色小點加淡色字，滑過才變深 */
+.mlabel.out { top: 0; transform: translateY(-50%); line-height: 20px; pointer-events: auto; cursor: pointer; padding: 0 2px;
+  font: 400 12px/20px var(--font-tool); letter-spacing: .04em; color: var(--ink-2); background: none; border: 0;
+  display: inline-flex; align-items: center; gap: 5px; }
+.mlabel.out::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+.mlabel.out.novelty::before { background: var(--novelty); } .mlabel.out.method::before { background: var(--method); }
+.mlabel.out.result::before { background: var(--result); }
+.mlabel.out.left { left: auto; right: calc(100% + 28px); flex-direction: row-reverse; } .mlabel.out.right { left: calc(100% + 28px); right: auto; }
+.mlabel.out:hover, .mlabel.out:focus-visible { color: var(--ink); }
+.mlabel.out:focus-visible { outline: 1px solid var(--lamp); outline-offset: 2px; }
 .mlead { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.mlead path { fill: none; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; opacity: .75; }
-.mlead path.novelty { stroke: var(--novelty); } .mlead path.method { stroke: var(--method); } .mlead path.result { stroke: var(--result); }
-.mlead path.hot { stroke-width: 1.6; opacity: 1; }
+.mlead path { fill: none; stroke: var(--rule-strong); stroke-width: .75; stroke-linejoin: round; stroke-linecap: round; }
+.mlead circle.novelty { fill: var(--novelty); } .mlead circle.method { fill: var(--method); } .mlead circle.result { fill: var(--result); }
+.mlead path.hot { stroke: var(--ink-3); stroke-width: 1; }
 .page .hl.hot.novelty { box-shadow: 0 0 0 1.5px var(--novelty); } .page .hl.hot.method { box-shadow: 0 0 0 1.5px var(--method); }
 .page .hl.hot.result { box-shadow: 0 0 0 1.5px var(--result); }
 .cmark { position: absolute; pointer-events: auto; padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--rule-strong);
@@ -280,6 +308,8 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
 /* PDF.js 文字層：透明文字疊在 canvas 上，讓你可以選取 */
 .textLayer { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-size-adjust: none; forced-color-adjust: none;
   transform-origin: 0 0; z-index: 2; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: -1; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
 .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
 .textLayer ::selection { background: transparent; }  /* 改由 .selLayer .sel 畫 */
 

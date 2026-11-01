@@ -37,6 +37,7 @@
   <symbol id="i-theme-dark" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <!-- Lantern 標誌（與 img/logo.svg 同形）：燈體 currentColor、玻璃是燈光色 -->
   <symbol id="i-lantern" viewBox="0 0 32 32"><circle cx="16" cy="3.6" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 9.6h11l-1.6-3.1h-7.8z" fill="currentColor"/><rect x="9.5" y="9.4" width="13" height="2.2" rx=".6" fill="currentColor"/><path d="M11.4 12.6h9.2c.9 1.6 1.4 3.4 1.4 5.2s-.5 3.6-1.4 5.2h-9.2c-.9-1.6-1.4-3.4-1.4-5.2s.5-3.6 1.4-5.2z" style="fill: var(--lamp)"/><path d="M10.6 12.2v11.2M21.4 12.2v11.2M16 12.2v2M16 21.4v2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14.6c1.6 1.6 2 3.2 0 5.6-2-2.4-1.6-4 0-5.6z" fill="currentColor"/><rect x="8.6" y="23.4" width="14.8" height="2.4" rx=".6" fill="currentColor"/><path d="M9.6 25.8h12.8l1.2 3.4H8.4z" fill="currentColor"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -155,7 +156,7 @@
   <!-- 左欄只放「這篇」：大綱在上，下面是同研究主題的其他論文 -->
   <aside id="lib" class="lib" tabindex="-1" aria-label="這篇論文">
     <section>
-      <h2 class="lhead">大綱 <button id="btnAiOutline" class="link small" title="PDF 沒有目錄時用 AI 生成">AI 生成</button></h2>
+      <h2 class="lhead">大綱 <span class="lacts"><button id="btnAiOutline" class="link small" title="PDF 沒有目錄時用 AI 生成">AI 生成</button><button id="libPin" class="icon lpin" aria-pressed="false" title="固定左欄（不固定時，滑過左緣才展開）" aria-label="固定左欄"><svg aria-hidden="true"><use href="#i-pin"/></svg></button></span></h2>
       <ul id="outline" class="list outline"></ul>
     </section>
     <section class="lsib">
