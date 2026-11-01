@@ -405,6 +405,7 @@ async function renderPage(i) {
   pg.canvas = canvas;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport,
                       transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+  $(".stale", pg.el)?.remove();  // 縮放前的舊頁圖：新的畫好才拿掉
   S.firstPage?.();
 
   const tl = document.createElement("div");
@@ -644,25 +645,64 @@ $("#pageInput").addEventListener("keydown", (e) => {
   e.target.blur();
 });
 
-function zoom(f) {
+/** 縮放並重建頁面；at = [clientX, clientY]：縮放後這一點底下仍是同一處內容（預設閱讀區中心）。
+ *  重建時先把舊的頁圖拉伸墊在新頁上（.stale），新的畫好才拿掉，不會整片閃白。 */
+function zoom(f, at) {
   if (!S.paper) return;
-  const v = $("#viewer"), ratio = v.scrollTop / v.scrollHeight;
+  const v = $("#viewer"), vr = v.getBoundingClientRect();
+  const [cx, cy] = at || [vr.left + vr.width / 2, vr.top + vr.height / 2];
+  // 錨點：游標底下（或最近）的那一頁，以及游標在頁內的比例位置
+  const hit = document.elementFromPoint(cx, cy)?.closest(".page, .twin")
+    || S.pages.map((p) => p.el).find((el) => el.getBoundingClientRect().bottom > cy);
+  const hr = hit?.getBoundingClientRect(), twin = hit?.classList.contains("twin"), idx = hit ? +hit.dataset.page : -1;
+  const fx = hr ? (cx - hr.left) / hr.width : 0, fy = hr ? (cy - hr.top) / hr.height : 0;
+  const old = S.pages.map((p) => [$("canvas", p.el), $("canvas", p.twin)]);  // 還沒重畫好的頁就沿用它的舊圖
   S.scale = Math.min(3, Math.max(0.5, +(S.scale * f).toFixed(2)));
   buildPages();
-  v.scrollTop = ratio * v.scrollHeight;
+  old.forEach((cs, i) => [S.pages[i]?.el, S.pages[i]?.twin].forEach((host, k) => {
+    if (host && cs[k]) { cs[k].className = "stale"; cs[k].style.width = cs[k].style.height = ""; host.prepend(cs[k]); }
+  }));
+  if (idx < 0) return;
+  // 新列在瀏覽器判定「在畫面上」之前都被 content-visibility 跳過排版（寬度 0），橫向捲動會被夾回 0；
+  // 錨點那一列固定照常排版（下次重建就換掉，只多排一列）
+  const anchor = twin ? S.pages[idx].twin : S.pages[idx].el;
+  anchor.parentElement.style.contentVisibility = "visible";
+  const nr = anchor.getBoundingClientRect();
+  v.scrollLeft += nr.left + fx * nr.width - cx;
+  v.scrollTop += nr.top + fy * nr.height - cy;
 }
-$("#btnZoomIn").onclick = () => zoom(1.15);
-$("#btnZoomOut").onclick = () => zoom(1 / 1.15);
-// Ctrl／⌘＋滾輪（觸控板捏合也是這個事件）：攔下瀏覽器整頁縮放，改縮論文。
-// 累積倍率、停手 150ms 才重建頁面（buildPages 很重），期間百分比先即時跟著變
-let wheelF = 1, wheelT = 0;
+
+/* 平滑縮放：先用 CSS transform 即時放大縮小（便宜），停手後才真正重建頁面。
+   多次連續（滾輪、捏合、連按按鈕）累積成一次重建，錨點固定在第一下的位置 */
+let zoomPend = 1, zoomT = 0, zoomAt = null;
+function smoothZoom(f, cx, cy, delay = 160) {
+  if (!S.paper) return;
+  const wrap = $("#pages");
+  if (!zoomAt) {
+    const r = wrap.getBoundingClientRect();
+    zoomAt = [cx, cy];
+    wrap.style.transformOrigin = `${cx - r.left}px ${cy - r.top}px`;
+  }
+  zoomPend = Math.min(3 / S.scale, Math.max(0.5 / S.scale, zoomPend * f));
+  wrap.style.transition = "transform .12s ease-out";
+  wrap.style.transform = `scale(${zoomPend})`;
+  $("#zoomLabel").textContent = `${Math.round(S.scale * zoomPend * 100)}%`;
+  clearTimeout(zoomT);
+  zoomT = setTimeout(() => {
+    const g = zoomPend, at = zoomAt;
+    zoomPend = 1; zoomAt = null;
+    wrap.style.transition = wrap.style.transform = "";
+    zoom(g, at);
+  }, delay);
+}
+const viewerCenter = () => { const r = $("#viewer").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+$("#btnZoomIn").onclick = () => smoothZoom(1.15, ...viewerCenter(), 260);
+$("#btnZoomOut").onclick = () => smoothZoom(1 / 1.15, ...viewerCenter(), 260);
+// Ctrl／⌘＋滾輪（觸控板捏合也是這個事件）：攔下瀏覽器整頁縮放，改縮論文，以游標為中心
 $("#viewer").addEventListener("wheel", (e) => {
   if (!(e.ctrlKey || e.metaKey) || !S.paper) return;
   e.preventDefault();
-  wheelF *= Math.exp(-e.deltaY * 0.002);  // 一格滾輪（deltaY≈100）約 1.2 倍
-  $("#zoomLabel").textContent = `${Math.round(Math.min(3, Math.max(0.5, S.scale * wheelF)) * 100)}%`;
-  clearTimeout(wheelT);
-  wheelT = setTimeout(() => { const f = wheelF; wheelF = 1; zoom(f); }, 150);
+  smoothZoom(Math.exp(-e.deltaY * 0.002), e.clientX, e.clientY);  // 一格滾輪（deltaY≈100）約 1.2 倍
 }, { passive: false });
 // Ctrl／⌘＋拖曳：放大後頁面超出閱讀區時，抓著頁面移動（上下左右）
 $("#viewer").addEventListener("mousedown", (e) => {
@@ -1552,12 +1592,13 @@ function setTrMode(mode) {
 /** 並排模式：把原文頁的畫面複製到譯文頁當底圖，圖表、公式原樣保留，文字段落再蓋上譯文。 */
 function syncTwin(i) {
   const pg = S.pages[i];
-  if (!pg?.canvas || $("canvas", pg.twin)) return;
+  if (!pg?.canvas || $("canvas:not(.stale)", pg.twin)) return;
   const c = document.createElement("canvas");
   c.width = pg.canvas.width; c.height = pg.canvas.height;
   c.style.width = pg.canvas.style.width; c.style.height = pg.canvas.style.height;
   c.getContext("2d").drawImage(pg.canvas, 0, 0);
   pg.twin.prepend(c);
+  $(".stale", pg.twin)?.remove();
 }
 
 function queueTranslation(i, first = false) {
