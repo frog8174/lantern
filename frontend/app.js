@@ -770,6 +770,7 @@ let litEls = [];
 document.addEventListener("selectionchange", () => {
   litEls.forEach((el) => (el.classList.contains("trb") ? el.classList.remove("lit") : el.remove()));
   litEls = [];
+  clearLitAlign();
   const sel = getSelection();
   const host = !sel.isCollapsed && sel.rangeCount && sel.anchorNode?.parentElement?.closest(".page, .twin");
   const i = host ? +host.dataset.page : -1, pg = S.pages[i];
@@ -796,6 +797,44 @@ document.addEventListener("selectionchange", () => {
   }
 });
 
+/* 並排模式的逐句對應：選完字（放開滑鼠）後問 /align，對方那邊只亮「對應的那句」，取代整段的淡框。
+ * 英→中：譯文裡那段用燈光色 mark 標出（借 markTranslation 畫）；中→英：原文頁畫出那句的位置。結果有伺服器快取。 */
+let litAlign = null, litJob = 0;
+function clearLitAlign() {
+  litJob++;
+  if (!litAlign) return;
+  const p = litAlign.page;
+  litAlign = null;
+  markTranslation(p);
+}
+async function correspond(sel) {
+  const blocks = S.trMode === "side" && S.tr[sel.page];
+  if (!blocks?.done) return;
+  const fromZh = sel.block != null;
+  const area = (b) => sel.rects.reduce((s, r) => s + overlap(r, b.bbox), 0);
+  const k = fromZh ? sel.block : blocks.reduce((best, b, j) => (b.tr && area(b) > (best < 0 ? 0 : area(blocks[best])) ? j : best), -1);
+  if (k < 0 || !blocks[k]?.tr) return;
+  const job = ++litJob, pid = S.paper.id, pg = S.pages[sel.page];
+  const r = await api(`/api/papers/${pid}/align`, { method: "POST",
+    body: { page: sel.page, block: k, quote: sel.text.slice(0, 2000), direction: fromZh ? "zh2en" : "en2zh" } }).catch(() => null);
+  if (job !== litJob || S.paper?.id !== pid || !r?.match) return;  // 選取已經換了，或對不到（保留整段淡框）
+  litEls.filter((el) => el.classList.contains("srcbox") || el.classList.contains("trb"))
+    .forEach((el) => (el.classList.contains("trb") ? el.classList.remove("lit") : el.remove()));
+  if (fromZh) {
+    for (const rc of r.rects || []) {
+      const d = document.createElement("div");
+      d.className = "srclit";
+      Object.assign(d.style, { left: `${rc[0] * 100}%`, top: `${rc[1] * 100}%`,
+                               width: `${(rc[2] - rc[0]) * 100}%`, height: `${(rc[3] - rc[1]) * 100}%` });
+      $(".selLayer", pg.el).appendChild(d);
+      litEls.push(d);
+    }
+  } else {
+    litAlign = { page: sel.page, block: k, zh: r.match };
+    markTranslation(sel.page);
+  }
+}
+
 document.addEventListener("mouseup", (e) => {
   $$(".textLayer.selecting").forEach((t) => t.classList.remove("selecting"));
   if (e.button !== 0 || selBar.contains(e.target) || S.cropping || crop) return;
@@ -809,6 +848,7 @@ document.addEventListener("mouseup", (e) => {
     const w = selBar.offsetWidth;
     selBar.style.left = `${Math.min(innerWidth - w - 8, Math.max(8, b.left + b.width / 2 - w / 2))}px`;
     selBar.style.top = `${b.top > 110 ? b.top - 52 : b.bottom + 10}px`;
+    correspond(lastSel);
   }, 0);
 });
 document.addEventListener("mousedown", (e) => {
@@ -1440,7 +1480,7 @@ async function pumpTranslation() {
     });
     if (S.paper?.id === pid && S.tr[page]) { blocks.done = true; drawTranslation(page); }
     // 翻譯前就畫好的螢光筆，現在補同步到譯文
-    if (S.paper?.id === pid) S.annotations.filter((x) => x.page === page && x.kind === "user" && !x.align).forEach(alignHighlight);
+    if (S.paper?.id === pid) S.annotations.filter((x) => x.page === page && (x.kind === "user" || AUTO[x.kind]) && !x.align).forEach(alignHighlight);
   } catch (e) {
     delete S.tr[page];
     const pg = S.pages[page];
@@ -1491,6 +1531,7 @@ function markTranslation(i) {
   const pg = S.pages[i], blocks = S.tr[i];
   if (!pg || !blocks) return;
   const anns = S.annotations.filter((a) => a.page === i && a.align && visibleOnPage(a));
+  if (litAlign?.page === i) anns.push({ id: "lit", align: litAlign, lit: true });
   for (const d of [pg.el, pg.twin].flatMap((host) => $$(".trb.done", host))) {
     const tr = blocks[d.dataset.i].tr, marks = [];
     for (const a of anns.filter((a) => a.align.block === +d.dataset.i)) {
@@ -1500,12 +1541,14 @@ function markTranslation(i) {
     if (!marks.length && !d.children.length) continue;
     d.textContent = "";
     let pos = 0;
-    for (const [s, e, a, weak] of marks.sort((x, y) => x[0] - y[0])) {
+    for (const [s, e, a, weak] of marks.sort((x, y) => x[0] - y[0] || (y[2].lit ? 1 : 0) - (x[2].lit ? 1 : 0))) {
       if (s < pos) continue;  // shortcut: 重疊的對應段只畫先開始的那段；要疊色再拆成小段
       const m = document.createElement("mark");
-      m.className = `trm ${weak}`;
+      m.className = `trm ${weak}${a.lit ? " lit" : ""}`;
       m.dataset.id = a.id;
-      m.style.setProperty("--c", isHex(a.color) ? tint(a.color, 0.34) : `var(--hl-${a.color})`);
+      // 自動標註用類別色（新穎／方法／結果），螢光筆用使用者選的顏色，選取對應用燈光色
+      m.style.setProperty("--c", a.lit ? "var(--lamp-fill)" : AUTO[a.kind] ? `var(--${a.kind.slice(5)}-bg)`
+        : isHex(a.color) ? tint(a.color, 0.34) : `var(--hl-${a.color})`);
       m.textContent = tr.slice(s, e);
       d.append(tr.slice(pos, s), m);
       pos = e;
@@ -1534,6 +1577,7 @@ $("#btnHighlight").onclick = async () => {
   try {
     const auto = await api(`/api/papers/${S.paper.id}/auto-highlight${refresh ? "?refresh=true" : ""}`, { method: "POST" });
     S.annotations = S.annotations.filter((a) => !a.kind.startsWith("auto:")).concat(auto);
+    auto.forEach(alignHighlight);  // 已翻好的頁馬上同步到譯文；沒翻的頁等翻完時補
     S.filter.auto = true;
     $("#showAuto").checked = true;
     S.pages.forEach((_, i) => drawHighlights(i));

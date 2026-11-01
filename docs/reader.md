@@ -25,3 +25,8 @@
 - 成功的結果存 `cache`（kind `align`，key `頁:區塊:方向:quote`）；失敗的不快取。
 
 `annotations` 表多一欄 `align TEXT DEFAULT 'null'`（JSON；`init()` 裡用 PRAGMA table_info + ALTER 升級舊資料庫）。`POST /annotations` 可帶 `align`；`PATCH /api/annotations/{id}` 的 `comment`、`align` 都選填，只改有給的。
+
+## 逐句對應（並排模式）
+- 選完字（放開滑鼠）後呼叫 `/align`：選英文 → 譯文只亮對應的那句（燈光色 mark，借 `markTranslation` 畫）；選中文 → 原文頁畫出那句的位置（`.srclit`）。
+- 等待回應時先顯示整段淡框；回應到了換成逐句，對不到就保留整段淡框。結果有伺服器快取，同一句第二次是即時的。
+- 自動標註（新穎／方法／結果）也同步到譯文，用類別色；翻譯前就有的標註在那頁翻完時補同步。

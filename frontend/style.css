@@ -249,6 +249,7 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .page .hlLayer, .page .cropLayer, .page .selLayer { position: absolute; inset: 0; pointer-events: none; }
 /* 選取中的連續色帶（取代被 span 縫隙切碎的原生選取色）與並排模式對應的原文區塊淡框 */
 .selLayer .sel { position: absolute; background: var(--lamp-fill); mix-blend-mode: multiply; }
+.selLayer .srclit { position: absolute; background: var(--lamp-fill); mix-blend-mode: multiply; box-shadow: 0 0 0 2px rgba(232, 184, 92, .45); }
 .selLayer .srcbox { position: absolute; border-radius: 2px; box-shadow: 0 0 0 3px rgba(232, 184, 92, .55); }
 .page .hl { position: absolute; border-radius: 1px; mix-blend-mode: multiply; }
 .page .hl.yellow { background: var(--hl-yellow); } .page .hl.green { background: var(--hl-green); }
@@ -327,6 +328,7 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
   background-image: linear-gradient(rgba(232, 184, 92, .14), rgba(232, 184, 92, .14)); }
 /* 螢光筆同步到譯文：--c 是標註顏色；對不到原句時整段淡淡標 */
 .trb .trm { background: var(--c); color: inherit; padding: 0; }
+.trb .trm.lit { box-shadow: 0 0 0 2px rgba(232, 184, 92, .55); border-radius: 2px; }
 .trb .trm.weak { background: color-mix(in srgb, var(--c) 45%, transparent); }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .trErr { position: absolute; top: 8px; left: 8px; right: 8px; padding: 6px 10px; background: #FBF9F4; border-left: 3px solid var(--seal);
