@@ -338,6 +338,7 @@ function buildPages() {
   S.paper.page_sizes.forEach(([w, h], i) => {
     const row = document.createElement("div");
     row.className = "prow";
+    row.style.containIntrinsicHeight = `${h * S.scale}px`;  // 畫面外的列跳過排版（content-visibility），仍佔正確高度
     const size = `width:${w * S.scale}px;height:${h * S.scale}px`;
     row.innerHTML = `<div class="page" data-page="${i}" style="${size}"><div class="hlLayer"></div><div class="selLayer"></div>
         <div class="pno">${i + 1} / ${S.paper.num_pages}</div></div>
@@ -611,7 +612,8 @@ rail.addEventListener("keydown", (e) => {
   S.pages[Math.max(0, Math.min(n - 1, to))].el.scrollIntoView({ block: "start" });
 });
 // 視窗或面板寬度變了：scrollHeight 跟著變，刻度位置要重算
-new ResizeObserver(() => drawRail()).observe(viewerEl);
+let railRaf = 0;
+new ResizeObserver(() => { if (!railRaf) railRaf = requestAnimationFrame(() => { railRaf = 0; drawRail(); }); }).observe(viewerEl);
 
 $("#pageInput").addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || !S.paper) return;
@@ -661,12 +663,14 @@ $("#panelGrip").addEventListener("mousedown", (e) => {
   const grip = e.currentTarget, wide = mainEl.classList.contains("nbwide");
   grip.classList.add("dragging");
   let w = panelEl.offsetWidth;
+  let raf = 0;  // 拖曳時每一幀最多改一次寬度：改欄寬會讓整份 PDF 重新排版，滑鼠事件比畫面更新頻繁得多
   const move = (ev) => {
     w = Math.round(Math.min(innerWidth * (wide ? 0.8 : 0.55), Math.max(wide ? 420 : 280, innerWidth - ev.clientX)));
-    (wide ? setNbWidth : setPanelWidth)(w);
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; (wide ? setNbWidth : setPanelWidth)(w); });
   };
   const up = () => {
     grip.classList.remove("dragging");
+    cancelAnimationFrame(raf); (wide ? setNbWidth : setPanelWidth)(w);
     store.set(wide ? "lantern.nbW" : "lantern.panelW", w);
     removeEventListener("mousemove", move); removeEventListener("mouseup", up);
   };

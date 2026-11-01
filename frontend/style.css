@@ -241,7 +241,9 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .rtick:hover { background: var(--ink); }
 /* safe center：頁面比視窗寬時改成靠左，左半邊才捲得到（一般 center 會切掉） */
 #pages { display: flex; flex-direction: column; align-items: safe center; gap: 28px; }
-.prow { display: flex; gap: 18px; }
+/* 畫面外的頁跳過排版與繪製：拖曳右欄、縮放視窗時只重排看得到的頁（數千個文字層 span）。
+   高度由 JS 設 contain-intrinsic-height＝頁高，捲動位置與跳頁不受影響 */
+.prow { display: flex; gap: 18px; content-visibility: auto; }
 .page, .twin { position: relative; background: white; box-shadow: var(--shadow-page); flex: none; }
 .twin { display: none; }
 #pages.tr-side .twin { display: block; }
