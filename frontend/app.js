@@ -911,9 +911,14 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     setCropping(false); clearCrop(); closeAiCard(); setLibDrawer(false);
     selBar.hidden = true; $("#ctxMenu").hidden = true; $("#citeCard").hidden = true; hideFigure();
+    // 筆記：先關引用選單；再按一次（且焦點在筆記裡、編輯器沒先用掉這個 Esc）才收回展開書寫
+    if (!$("#nbCitePick").hidden) $("#nbCitePick").hidden = true;
+    else if (!e.defaultPrevented && mainEl.classList.contains("nbwide")
+             && (document.activeElement === document.body || document.activeElement?.closest("#tab-notebook"))) $("#nbWide").click();
     return;
   }
-  if (selBar.hidden || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
+  if (selBar.hidden || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)
+      || document.activeElement?.isContentEditable) return;  // 筆記編輯器（CodeMirror）是 contenteditable
   const act = { e: "explain", h: "highlight", t: "translate", c: "comment", q: "quote" }[e.key.toLowerCase()];
   if (act) { e.preventDefault(); selAction(act); }
 });
@@ -1599,6 +1604,7 @@ function openPanel(name) {
     b.setAttribute("aria-selected", b.dataset.tab === name);
   });
   $$(".tab").forEach((t) => t.classList.toggle("on", t.id === `tab-${name}`));
+  nbWideApply();  // 展開書寫只跟著「筆記」分頁
 }
 $$(".tabs button[data-tab]").forEach((b) => (b.onclick = () => openPanel(b.dataset.tab)));
 
@@ -1727,13 +1733,46 @@ function renderRefs() {
 $("#refSearch").oninput = renderRefs;
 
 /* ---------------- 筆記分頁（docs/notes-design.md）----------------
- * 每篇一份 Markdown，原生 textarea（中文輸入法最穩）＋ renderWiki 預覽。
+ * 每篇一份 Markdown。編輯器是 CodeMirror 6（即時排版，見下方 nbMountCM）；CDN 載不到就留著原生 textarea。
+ * 兩者都經過 nbGet / nbSet / nbSel / nbReplace，其他程式不必知道現在是哪一個。
  * 自動儲存：停手 1 秒、失焦、切走分頁時存；組字中不存。PUT 帶 base_updated，別的分頁先存過會回 409，不覆蓋。
  * 還沒存進伺服器的內容隨時備份在 localStorage（lantern.note.<pid>），存成功才清掉。 */
 const nbText = $("#nbText");
-const NB = { pid: null, updated: null, saved: "", timer: 0, busy: false, again: false, conflict: null, composing: false };
+const NB = { pid: null, updated: null, saved: "", timer: 0, busy: false, again: false, conflict: null, composing: false,
+             locked: true, setting: false, statTimer: 0 };
+let cm = null, cmx = null;  // CodeMirror 的 EditorView 與它的幾個工具；null = 還沒載入或載入失敗，用 textarea
 const nbKey = (pid) => `lantern.note.${pid}`;
-const nbStatus = (t, cls = "") => { $("#nbStatus").textContent = t; $("#nbStatus").className = `nbstatus small ${cls || "muted"}`; };
+const nbStatus = (t, cls = "") => {
+  $("#nbStatus").textContent = $("#nbHeadStatus").textContent = t;
+  $("#nbStatus").className = $("#nbHeadStatus").className = `small ${cls || "muted"}`;
+};
+const nbGet = () => (cm ? cm.state.doc.toString() : nbText.value);
+/** 程式換掉整份內容（載入、改用另一份）：不算使用者編輯，不備份、不進復原紀錄。 */
+function nbSet(md) {
+  NB.setting = true;
+  if (cm) cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: md }, annotations: cmx.addToHistory.of(false) });
+  else nbText.value = md;
+  NB.setting = false;
+  nbStatsLater();
+}
+/** 讀到伺服器那份之前鎖住，免得打的字被蓋掉。 */
+function nbLock(on) {
+  NB.locked = nbText.readOnly = on;
+  cm?.dispatch({ effects: cmx.lock(on) });
+}
+const nbSel = () => (cm ? [cm.state.selection.main.from, cm.state.selection.main.to] : [nbText.selectionStart, nbText.selectionEnd]);
+/** 把 [from, to) 換成 text，選取 [a, b]（預設游標放在插入內容之後）。 */
+function nbReplace(from, to, text, a = from + text.length, b = a) {
+  if (cm) {
+    cm.dispatch({ changes: { from, to, insert: text }, selection: { anchor: a, head: b }, scrollIntoView: true, userEvent: "input" });
+    cm.focus();  // updateListener 會呼叫 noteChanged
+  } else {
+    nbText.focus();
+    nbText.setRangeText(text, from, to);
+    nbText.setSelectionRange(a, b);
+    noteChanged();
+  }
+}
 
 /** 筆記頂端的提示列（衝突、還原草稿）：文字 + 幾個動作按鈕；不給 actions 就收起來。 */
 function nbMsg(text, actions = []) {
@@ -1753,9 +1792,9 @@ async function loadNote(pid) {
   if (NB.pid && NB.pid !== pid) saveNote();  // 換篇前把上一篇沒存的送出去（saveNote 先記下 pid 與內容）
   clearTimeout(NB.timer);
   Object.assign(NB, { pid, updated: null, saved: "", conflict: null });
-  nbText.value = "";
-  nbText.readOnly = true;  // 讀到伺服器那份之前不能打字，免得被蓋掉
-  nbMsg(""); nbStatus("");
+  nbSet("");
+  nbLock(true);
+  nbMsg(""); nbStatus(""); nbHead();
   $("#nbDraftBox").hidden = true;
   const cardNote = S.paper?.note;
   $("#nbCardNote").hidden = !cardNote;
@@ -1769,22 +1808,23 @@ async function loadNote(pid) {
   }
   if (NB.pid !== pid) return;
   Object.assign(NB, { updated: n.updated, saved: n.markdown });
-  nbText.value = n.markdown;
-  nbText.readOnly = false;
+  nbSet(n.markdown);
+  nbLock(false);
   if ($("#nbMode .on").dataset.m === "preview") renderWiki($("#nbPreview"), n.markdown);
   if (n.updated) nbStatus(`上次儲存 ${fmtDate(n.updated)}`);
   const local = store.get(nbKey(pid), null);
   if (local == null || local === n.markdown) return store.del(nbKey(pid));
   nbMsg("這台電腦上有一份還沒存進伺服器的筆記內容（可能上次存檔失敗或分頁被關掉）。", [
-    ["還原那份", () => { nbText.value = local; noteChanged(); }],
+    ["還原那份", () => { nbSet(local); noteChanged(); }],
     ["不用了", () => store.del(nbKey(pid))],
   ]);
 }
 
 /** 內容變了：先備份到 localStorage，停手 1 秒後存。組字中（注音、倉頡選字）什麼都不做，等 compositionend。 */
 function noteChanged() {
-  if (NB.composing || !NB.pid) return;
-  store.set(nbKey(NB.pid), nbText.value);
+  if (NB.setting || NB.composing || !NB.pid) return;
+  nbStatsLater();
+  store.set(nbKey(NB.pid), nbGet());
   clearTimeout(NB.timer);
   NB.timer = setTimeout(saveNote, 1000);
   if (!NB.conflict) nbStatus("尚未儲存…");
@@ -1797,8 +1837,8 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 async function saveNote() {
   clearTimeout(NB.timer);
-  const pid = NB.pid, md = nbText.value;
-  if (!pid || nbText.readOnly || md === NB.saved || NB.conflict) return;
+  const pid = NB.pid, md = nbGet();
+  if (!pid || NB.locked || md === NB.saved || NB.conflict) return;
   if (NB.busy) { NB.again = true; return; }  // 一次只送一個，不然第二個會拿舊的 updated 撞 409
   NB.busy = true;
   nbStatus("儲存中…");
@@ -1815,7 +1855,7 @@ async function saveNote() {
       throw new Error(r.status === 422 ? "筆記太長（上限約一百萬字）" : out.detail || r.statusText);
     } else {
       Object.assign(NB, { updated: out.updated, saved: md });
-      if (nbText.value === md) store.del(nbKey(pid));
+      if (nbGet() === md) store.del(nbKey(pid));
       nbStatus(`已儲存 ${new Date(out.updated * 1000).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}`);
     }
   } catch (e) {
@@ -1833,10 +1873,10 @@ function noteConflict(server) {
   nbMsg("另一個分頁（或裝置）改過這份筆記。你這邊的內容還在編輯框裡，沒有被蓋掉。", [
     ["用我這份", () => { NB.updated = server.updated; NB.conflict = null; saveNote(); }],
     ["改用另一份（我這份先複製）", async () => {
-      await navigator.clipboard.writeText(nbText.value).then(() => toast("<span>你原本那份已複製到剪貼簿</span>"),
+      await navigator.clipboard.writeText(nbGet()).then(() => toast("<span>你原本那份已複製到剪貼簿</span>"),
         () => toast('<span class="err">複製失敗；你原本那份仍備份在這台電腦上</span>'));
       Object.assign(NB, { updated: server.updated, saved: server.markdown, conflict: null });
-      nbText.value = server.markdown;
+      nbSet(server.markdown);
       if ($("#nbMode .on").dataset.m === "preview") renderWiki($("#nbPreview"), server.markdown);
       nbStatus(`已載入較新的版本 ${fmtDate(server.updated)}`);
     }],
@@ -1845,17 +1885,17 @@ function noteConflict(server) {
 
 function setNbMode(m) {
   $$("#nbMode button").forEach((b) => { b.classList.toggle("on", b.dataset.m === m); b.setAttribute("aria-pressed", b.dataset.m === m); });
-  nbText.hidden = m === "preview";
+  $("#nbSheet").hidden = $("#nbTools").hidden = m === "preview";
   $("#nbPreview").hidden = m !== "preview";
   if (m === "preview") {
-    renderWiki($("#nbPreview"), nbText.value || "*（還沒寫任何東西）*");
+    renderWiki($("#nbPreview"), nbGet() || "*（還沒寫任何東西）*");
     saveNote();
   }
 }
 $("#nbMode").onclick = (e) => { const b = e.target.closest("button[data-m]"); if (b) setNbMode(b.dataset.m); };
 
-// 預覽裡的引用：同一篇直接跳頁並閃標註；別篇先開那篇
-$("#nbPreview").onclick = (e) => {
+// 預覽與編輯器裡的引用晶片：同一篇直接跳頁並閃標註；別篇先開那篇
+$("#nbPreview").onclick = $("#nbEditor").onclick = (e) => {
   if (e.target.closest("a.wref")) return e.preventDefault();  // [[slug]] 是 Wiki 頁，閱讀頁裡沒有對應，只顯示
   const c = e.target.closest(".wcite");
   if (c) openAt(c.dataset.pid, +c.dataset.page, c.dataset.aid)
@@ -1864,14 +1904,12 @@ $("#nbPreview").onclick = (e) => {
 
 /** 在游標處插入一段 Markdown（前後補空行），切到編輯並觸發自動儲存。 */
 function insertIntoNote(md) {
-  if (nbText.readOnly) return toast("<span>筆記還在載入，稍等一下再試</span>");
+  if (NB.locked) return toast("<span>筆記還在載入，稍等一下再試</span>");
   openPanel("notebook");
   setNbMode("edit");
-  const s = nbText.selectionStart, pre = nbText.value.slice(0, s);
+  const [s, e] = nbSel(), pre = nbGet().slice(0, s);
   const lead = !pre || pre.endsWith("\n\n") ? "" : pre.endsWith("\n") ? "\n" : "\n\n";
-  nbText.focus();
-  nbText.setRangeText(`${lead}${md.trim()}\n\n`, s, nbText.selectionEnd, "end");
-  noteChanged();
+  nbReplace(s, e, `${lead}${md.trim()}\n\n`);
 }
 
 /** 引用到筆記：原文做成引用區塊 + 回連標記；從標註來的帶 @aid（點了會閃那則標註），選字來的只到頁。 */
@@ -1910,7 +1948,7 @@ $("#nbExport").onclick = async () => {
   if (!S.paper) return;
   const p = S.paper, base = location.origin + location.pathname;
   const bib = await api(`/api/papers/${p.id}/cite`).then((r) => r.bib || {}, () => ({}));  // 書目拿不到就略過作者年份
-  const body = nbText.value.replace(/\[\[paper:([^#\s\]]+)#p(\d+)(?:@(\w+))?(?:\|[^\]]*)?\]\]/g,
+  const body = nbGet().replace(/\[\[paper:([^#\s\]]+)#p(\d+)(?:@(\w+))?(?:\|[^\]]*)?\]\]/g,
     (_, pid, n, aid) => `[p.${n}](${base}#${pid}/p${n}${aid ? `/${aid}` : ""})`);
   const q = (s) => JSON.stringify(String(s));  // JSON 字串也是合法的 YAML 雙引號字串
   const authors = (bib.authors || []).map((a) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean);
@@ -1928,11 +1966,278 @@ $("#nbExport").onclick = async () => {
 // 列印／存成 PDF：只印渲染好的筆記（style.css 的 body.printnote）
 $("#nbPrint").onclick = () => {
   const area = $("#nbPrintArea");
-  renderWiki(area, `# ${S.paper?.title || ""}\n\n${nbText.value}`);
+  renderWiki(area, `# ${S.paper?.title || ""}\n\n${nbGet()}`);
   document.body.classList.add("printnote");
   addEventListener("afterprint", () => document.body.classList.remove("printnote"), { once: true });
   print();
 };
+
+/* ---- 筆記：字數、大綱、展開書寫 ---- */
+const NB_CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+/** 字數：中日韓每個字算一字，其他文字以詞計；引用標記 [[…]] 不算。 */
+function nbWords(md) {
+  const s = md.replace(/\[\[[^\]\n]*\]\]/g, " ");
+  return (s.match(NB_CJK)?.length || 0) + (s.replace(NB_CJK, " ").match(/[\p{L}\p{N}]+(?:['’.-][\p{L}\p{N}]+)*/gu)?.length || 0);
+}
+/** 筆記裡的 # 標題（跳過程式碼區塊），pos 是該行在全文的位置。 */
+function nbHeadings(md) {
+  const out = [];
+  let fence = false, pos = 0;
+  for (const line of md.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+    const m = !fence && /^(#{1,6})\s+(.+?)[\s#]*$/.exec(line);
+    if (m) out.push({ level: m[1].length, text: m[2], pos });
+    pos += line.length + 1;
+  }
+  return out;
+}
+function nbStats() {
+  const md = nbGet();
+  $("#nbCount").textContent = `${nbWords(md).toLocaleString()} 字`;
+  if (!mainEl.classList.contains("nbwide")) return;
+  const hs = nbHeadings(md);
+  $("#nbOutline").innerHTML = hs.length
+    ? `<b class="small muted">大綱</b><ul>${hs.map((h) => `<li><button class="lv${Math.min(h.level, 3)}" data-pos="${h.pos}">${escapeHTML(h.text)}</button></li>`).join("")}</ul>`
+    : '<p class="small muted">用 # 開頭寫標題，這裡會列出大綱。</p>';
+}
+const nbStatsLater = () => { clearTimeout(NB.statTimer); NB.statTimer = setTimeout(nbStats, 250); };
+$("#nbOutline").onclick = (e) => {
+  const b = e.target.closest("button[data-pos]");
+  if (!b) return;
+  const pos = Math.min(+b.dataset.pos, nbGet().length);
+  if (cm) { cm.dispatch({ selection: { anchor: pos }, effects: cmx.scrollTo(pos) }); cm.focus(); }
+  else { nbText.focus(); nbText.setSelectionRange(pos, pos); }
+};
+
+const nbBib = {};  // pid → 書目（/cite 第一次可能要問模型，所以只在展開書寫時才拿、拿過就記著）
+/** 展開書寫的標頭：論文標題，作者與年份。 */
+async function nbHead() {
+  const p = S.paper;
+  $("#nbTitle").textContent = p ? p.title || p.filename : "";
+  $("#nbMeta").textContent = "";
+  if (!p || !mainEl.classList.contains("nbwide")) return;
+  nbBib[p.id] ??= await api(`/api/papers/${p.id}/cite`).then((r) => r.bib || {}, () => ({}));
+  if (S.paper?.id !== p.id) return;
+  const b = nbBib[p.id], fam = (b.authors || []).map((a) => a.family || a.given).filter(Boolean);
+  $("#nbMeta").textContent = [fam.slice(0, 3).join("、") + (fam.length > 3 ? " 等" : ""), b.year].filter(Boolean).join("，");
+}
+
+/** 展開書寫：筆記拿走大半個畫面，PDF 留在左邊。選擇記在這個瀏覽器；只在「筆記」分頁開著時生效。 */
+function nbWideApply() {
+  const on = store.get("lantern.nbWide", "") === "1" && $("#tab-notebook").classList.contains("on");
+  if (on && mainEl.classList.contains("floatpanel")) setPanelFloat(false);  // 浮動小視窗放不下大張紙，先停靠
+  mainEl.classList.toggle("nbwide", on);
+  const btn = $("#nbWide"), label = on ? "收回側欄" : "展開書寫";
+  btn.title = `${label}（Esc ${on ? "也可以" : "收回"}）`;
+  btn.setAttribute("aria-label", label);
+  btn.setAttribute("aria-pressed", on);
+  $("use", btn).setAttribute("href", on ? "#i-collapse" : "#i-expand");
+  if (on) { nbHead(); nbStats(); }
+}
+$("#nbWide").onclick = () => {
+  store.set("lantern.nbWide", mainEl.classList.contains("nbwide") ? "" : "1");
+  nbWideApply();
+  cm?.focus();
+};
+
+/* ---- 筆記：格式工具列、快捷鍵、斜線選單共用的動作 ---- */
+const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+/** 前後包標記（粗體、斜體、公式…）；已經包著就拿掉。 */
+function nbWrap(m) {
+  const doc = nbGet(), [f, t] = nbSel(), n = m.length;
+  const wrapped = doc.slice(f - n, f) === m && doc.slice(t, t + n) === m
+    && !(m === "*" && doc[f - n - 1] === "*" && doc[t + n] === "*");  // **粗體** 裡按斜體 → 變 ***粗斜體***，不是拆掉粗體
+  if (wrapped) nbReplace(f - n, t + n, doc.slice(f, t), f - n, t - n);
+  else nbReplace(f, t, m + doc.slice(f, t) + m, f + n, t + n);
+}
+/** 選到的每一行開頭加標記（標題、清單、引用）；都已經有就拿掉。標題、清單會換掉同類的舊標記。 */
+function nbLine(p) {
+  const doc = nbGet(), [f, t] = nbSel();
+  const a = doc.lastIndexOf("\n", f - 1) + 1, e = doc.indexOf("\n", t), b = e < 0 ? doc.length : e;
+  const lines = doc.slice(a, b).split("\n");
+  const kind = p[0] === "#" ? /^#{1,6} / : p === "> " ? /^> / : /^([-*+]|\d+[.)]) /;
+  const on = lines.every((l) => (p === "1. " ? /^\d+[.)] /.test(l) : l.startsWith(p)));
+  const out = lines.map((l, i) => (on ? "" : p === "1. " ? `${i + 1}. ` : p) + l.replace(kind, "")).join("\n");
+  nbReplace(a, b, out, a + out.length);
+}
+function nbLink() {
+  const doc = nbGet(), [f, t] = nbSel(), txt = doc.slice(f, t);
+  if (/^https?:\/\/\S+$/.test(txt)) return nbReplace(f, t, `[](${txt})`, f + 1);  // 選的是網址：游標放進 [] 填字
+  const s = `[${txt || "連結文字"}](https://)`;
+  if (txt) nbReplace(f, t, s, f + s.length - 9, f + s.length - 1);  // 選起 https://，直接貼網址
+  else nbReplace(f, t, s, f + 1, f + 5);
+}
+function nbMathBlock() {
+  const doc = nbGet(), [f, t] = nbSel(), lead = !f || doc[f - 1] === "\n" ? "" : "\n";
+  const s = `${lead}$$\n${doc.slice(f, t)}\n$$\n`;
+  nbReplace(f, t, s, f + lead.length + 3, f + s.length - 4);
+}
+/** 插入引用：從這篇的標註挑一則，跟「標註」分頁的「引用」一樣放進原文與回連標記。 */
+function nbCitePick() {
+  const box = $("#nbCitePick");
+  if (!box.hidden) { box.hidden = true; return; }
+  const list = S.annotations.filter((a) => a.text?.trim()).sort((x, y) => x.page - y.page);
+  box.innerHTML = list.length
+    ? `<ul>${list.map((a) => `<li><button data-id="${escapeHTML(a.id)}"><span class="small muted">p.${a.page + 1}</span><span>${escapeHTML(a.text.replace(/\s+/g, " ").slice(0, 90))}</span></button></li>`).join("")}</ul>`
+    : '<p class="small muted">這篇還沒有標註。在 PDF 選字後按「引用」（Q）也能直接放進筆記。</p>';
+  box.hidden = false;
+  $("button", box)?.focus();
+}
+$("#nbCitePick").onclick = (e) => {
+  const b = e.target.closest("button[data-id]"), a = b && S.annotations.find((x) => x.id === b.dataset.id);
+  if (!a) return;
+  $("#nbCitePick").hidden = true;
+  quoteToNote(a.text, a.page, a);
+};
+document.addEventListener("mousedown", (e) => { if (!e.target.closest("#nbCitePick, [data-cmd=cite]")) $("#nbCitePick").hidden = true; });
+
+// [名稱, 動作, 快捷鍵]；工具列的 title、斜線選單、Ctrl/⌘ 快捷鍵都從這裡來
+const NB_CMDS = {
+  h1: ["標題一", () => nbLine("# ")], h2: ["標題二", () => nbLine("## ")], h3: ["標題三", () => nbLine("### ")],
+  bold: ["粗體", () => nbWrap("**"), "B"], italic: ["斜體", () => nbWrap("*"), "I"], code: ["程式碼", () => nbWrap("`")],
+  link: ["連結", nbLink, "K"], ul: ["項目清單", () => nbLine("- ")], ol: ["編號清單", () => nbLine("1. ")],
+  quote: ["引用區塊", () => nbLine("> ")], math: ["行內公式", () => nbWrap("$")], mathblock: ["公式區塊", nbMathBlock],
+  cite: ["插入標註引用", nbCitePick],
+};
+const NB_KEYS = { b: "bold", i: "italic", k: "link" };
+for (const b of $$("#nbTools [data-cmd]")) {
+  const [name, , key] = NB_CMDS[b.dataset.cmd];
+  b.title = key ? `${name}（${MOD}${key}）` : name;
+  b.setAttribute("aria-label", name);
+}
+$("#nbTools").onmousedown = (e) => { if (e.target.closest("[data-cmd]")) e.preventDefault(); };  // 不搶走編輯器的焦點與選取
+$("#nbTools").onclick = (e) => {
+  const b = e.target.closest("[data-cmd]");
+  if (b && !NB.locked) NB_CMDS[b.dataset.cmd][1]();
+};
+nbText.addEventListener("keydown", (e) => {  // 純文字備援也有快捷鍵
+  const c = (e.ctrlKey || e.metaKey) && !e.altKey && NB_KEYS[e.key.toLowerCase()];
+  if (c && !NB.locked) { e.preventDefault(); NB_CMDS[c][1](); }
+});
+
+/* ---- CodeMirror 6：即時排版的 Markdown 編輯器 ----
+ * 從 esm.sh 動態載入，版本全部釘死。每個套件只帶「它自己依賴的」?deps=，產生的網址才會和套件之間互相 import 的網址一模一樣，
+ * 全頁只有一份 @codemirror/state（兩份會直接報錯）。載不到就留在 textarea，筆記照常能寫能存。
+ * shortcut: 傳遞依賴裡的 lang-html、style-mod、crelt 等是 esm.sh 依版本範圍解析，沒釘死；要完全鎖住得自己打包。 */
+const CM_URLS = (() => {
+  const St = "@codemirror/state@6.7.6", V = "@codemirror/view@6.43.15", L = "@codemirror/language@6.13.1",
+    C = "@lezer/common@1.5.5", H = "@lezer/highlight@1.2.5", A = "@codemirror/autocomplete@6.20.4";
+  return [[St], [V, St], [L, St, V, C, H], ["@codemirror/commands@6.11.1", L, St, V, C, H], [A, L, St, V, C, H],
+    ["@codemirror/lang-markdown@6.5.2", A, L, St, V, C, H, "@lezer/markdown@1.8.1"], [H, C]]
+    .map(([p, ...d]) => `https://esm.sh/${p}${d.length ? `?deps=${d.join(",")}` : ""}`);
+})();
+
+async function nbMountCM() {
+  const [st, vw, lang, cmd, ac, mdl, { tags: t }] = await Promise.all(CM_URLS.map((u) => import(u)));
+  const { Decoration: D, WidgetType, EditorView: EV } = vw;
+
+  class MathW extends WidgetType {
+    constructor(tex, block) { super(); this.tex = tex; this.block = block; }
+    eq(o) { return o.tex === this.tex && o.block === this.block; }
+    toDOM() {
+      const el = document.createElement(this.block ? "div" : "span");
+      el.className = this.block ? "cm-mathblock" : "cm-math";
+      try { katex.render(this.tex, el, { displayMode: this.block, throwOnError: false }); } catch { el.textContent = this.tex; }
+      return el;
+    }
+    ignoreEvent() { return false; }  // 點公式 = 把游標放進去，露出原文
+  }
+  class CiteW extends WidgetType {  // 點擊交給 #nbEditor 的 onclick（跟預覽同一段）
+    constructor(m) { super(); this.m = m; }
+    eq(o) { return o.m.join() === this.m.join(); }
+    toDOM() {
+      const s = document.createElement("span");
+      s.innerHTML = citeChip(...this.m);
+      s.firstElementChild.onmousedown = (e) => e.preventDefault();  // 不讓焦點離開編輯器（失焦重畫會把這顆換掉，click 就丟了）
+      return s.firstElementChild;
+    }
+  }
+
+  /** 即時排版：標題、引用、程式碼整行換樣式；游標不在的那幾行藏起 # ** > ` 標記，公式與引用標記換成排好的樣子。
+   * Markdown 原文一字不改，游標一碰到就露出原文。 */
+  function build(state) {
+    const doc = state.doc, sel = state.selection.ranges, out = [], code = [], marks = [], taken = [];
+    const near = (f, to) => state.field(focused) && sel.some((r) => r.from <= to && r.to >= f);  // 沒在編輯就全部排好
+    const lineCls = (f, to, cls) => { for (let p = f; p <= to;) { const l = doc.lineAt(p); out.push(D.line({ class: cls }).range(l.from)); p = l.to + 1; } };
+    lang.syntaxTree(state).iterate({ enter(n) {
+      const h = /^ATXHeading(\d)$/.exec(n.name);
+      if (h) lineCls(n.from, n.from, `cm-h cm-h${h[1]}`);
+      else if (n.name === "Blockquote") lineCls(n.from, n.to, "cm-bq");
+      else if (n.name === "FencedCode" || n.name === "CodeBlock") { lineCls(n.from, n.to, "cm-fence"); code.push([n.from, n.to]); return false; }
+      else if (n.name === "InlineCode") code.push([n.from, n.to]);
+      else if (n.name === "ListMark") out.push(D.mark({ class: "cm-lm" }).range(n.from, n.to));
+      else if (/^(HeaderMark|EmphasisMark|QuoteMark|CodeMark)$/.test(n.name)) {
+        const l = doc.lineAt(n.from);
+        if (!near(l.from, l.to)) marks.push([n.from, n.to + (/Header|Quote/.test(n.name) && doc.sliceString(n.to, n.to + 1) === " " ? 1 : 0)]);
+      }
+    } });
+    const re = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$|\[\[paper:([^#\s\]]+)#p(\d+)(?:@(\w+))?(?:\|[^\]\n]*)?\]\]/g;
+    for (const m of doc.toString().matchAll(re)) {
+      const f = m.index, to = f + m[0].length;
+      if (code.some(([a, b]) => f >= a && f < b)) continue;
+      taken.push([f, to]);
+      if (near(f, to)) { if (!m[3]) out.push(D.mark({ class: "cm-mathsrc" }).range(f, to)); continue; }
+      if (m[3]) { out.push(D.replace({ widget: new CiteW([m[3], m[4], m[5]]) }).range(f, to)); continue; }
+      const block = m[1] != null && f === doc.lineAt(f).from && to === doc.lineAt(to).to;
+      out.push(D.replace({ widget: new MathW((m[1] ?? m[2]).trim(), m[1] != null), block }).range(f, to));
+    }
+    for (const [f, to] of marks) if (!taken.some(([a, b]) => f < b && to > a)) out.push(D.replace({}).range(f, to));
+    return D.set(out, true);
+  }
+  const focusFx = st.StateEffect.define();
+  const focused = st.StateField.define({ create: () => false, update: (v, tr) => tr.effects.reduce((a, e) => (e.is(focusFx) ? e.value : a), v) });
+  // shortcut: 每次打字或移動游標都重算整份筆記，上萬行才會覺得慢；到時改成只算畫面上看得到的範圍。
+  const live = st.StateField.define({
+    create: build,
+    update: (d, tr) => (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(focusFx)) || lang.syntaxTree(tr.state) !== lang.syntaxTree(tr.startState) ? build(tr.state) : d),
+    provide: (f) => EV.decorations.from(f),
+  });
+  const look = lang.HighlightStyle.define([
+    { tag: t.heading, fontFamily: "var(--font-head)", fontWeight: "600" },
+    { tag: t.strong, fontWeight: "700" }, { tag: t.emphasis, fontStyle: "italic" }, { tag: t.strikethrough, textDecoration: "line-through" },
+    { tag: t.monospace, fontFamily: "ui-monospace, Consolas, monospace", fontSize: ".88em" },
+    { tag: t.link, color: "var(--link)" }, { tag: t.url, color: "var(--ink-3)" },
+    { tag: [t.processingInstruction, t.meta, t.contentSeparator], color: "var(--ink-3)" },  // # ** > ` 等標記
+  ]);
+  // 斜線選單：行首打 / 列出工具列的動作
+  const slash = (ctx) => {
+    const line = ctx.state.doc.lineAt(ctx.pos);
+    if (!/^\/[a-z0-9]*$/i.test(ctx.state.sliceDoc(line.from, ctx.pos))) return null;
+    return { from: line.from, validFor: /^\/[a-z0-9]*$/i, options: Object.entries(NB_CMDS).map(([k, [name, run, key]]) => ({
+      label: `/${k}`, detail: key ? `${name}（${MOD}${key}）` : name,
+      apply: (view, _c, from, to) => { view.dispatch({ changes: { from, to } }); run(); } })) };
+  };
+  const roC = new st.Compartment();
+  const doc = nbText.value, had = document.activeElement === nbText;
+  const view = new EV({ parent: $("#nbEditor"), state: st.EditorState.create({
+    doc, selection: { anchor: Math.min(nbText.selectionStart, doc.length), head: Math.min(nbText.selectionEnd, doc.length) },
+    extensions: [
+      cmd.history(), EV.lineWrapping, vw.placeholder(nbText.placeholder),
+      mdl.markdown({ base: mdl.markdownLanguage, completeHTMLTags: false }),  // GFM；Enter 會接續清單與引用
+      lang.syntaxHighlighting(look), focused, live, EV.focusChangeEffect.of((_s, on) => focusFx.of(on)),
+      ac.autocompletion({ override: [slash], icons: false }),
+      vw.keymap.of([...Object.entries(NB_KEYS).map(([k, c]) => ({ key: `Mod-${k}`, run: () => (NB.locked || NB_CMDS[c][1](), true) })),
+        ...cmd.defaultKeymap, ...cmd.historyKeymap]),
+      roC.of(st.EditorState.readOnly.of(NB.locked)),
+      EV.contentAttributes.of({ "aria-label": nbText.getAttribute("aria-label"), spellcheck: "false" }),
+      EV.updateListener.of((u) => {
+        if (u.docChanged) noteChanged();
+        if (u.focusChanged && !u.view.hasFocus && !NB.composing) saveNote();
+      }),
+      // 組字（注音、倉頡選字）中不存，跟 textarea 同一套
+      EV.domEventHandlers({
+        compositionstart: () => { NB.composing = true; clearTimeout(NB.timer); },
+        compositionend: () => { NB.composing = false; noteChanged(); },
+      }),
+    ] }) });
+  cmx = { addToHistory: st.Transaction.addToHistory, lock: (on) => roC.reconfigure(st.EditorState.readOnly.of(on)),
+          scrollTo: (pos) => EV.scrollIntoView(pos, { y: "start", yMargin: 24 }) };
+  cm = view;
+  nbText.hidden = true;
+  if (had) cm.focus();
+  nbStats();
+}
+nbMountCM().catch((e) => { console.warn("筆記編輯器載入失敗，改用純文字", e); $("#nbPlain").hidden = false; });
 
 /* ---------------- 摘要 ---------------- */
 async function runSummary(refresh) {
@@ -2352,6 +2657,14 @@ $("#wsTabs").onclick = (e) => {
 // 論文短標題：取冒號前那段（「BERT: Pre-training…」→「BERT」），太長就截斷
 const shortTitle = (t) => { t = String(t).split(/[:：]/)[0].trim(); return t.length > 26 ? t.slice(0, 24) + "…" : t; };
 
+/** [[paper:pid#pN@aid]] 的晶片（Wiki、筆記預覽、筆記編輯器共用）：短標題 + 頁碼，點了 openAt。 */
+function citeChip(pid, page, aid) {
+  const p = wsPaperList.find((x) => x.id === pid) || library.find((x) => x.id === pid) || (S.paper?.id === pid && S.paper);
+  const full = p ? p.title || p.filename : "論文";
+  return `<button class="wcite" data-pid="${escapeHTML(pid)}" data-page="${page}"${aid ? ` data-aid="${aid}"` : ""} title="${escapeHTML(full)}，第 ${page} 頁"
+    aria-label="開啟《${escapeHTML(full)}》第 ${page} 頁">${escapeHTML(shortTitle(full))}<span class="wcp">p.${page}</span></button>`;
+}
+
 /** 把 [[slug|字]]、[[paper:pid#pN]] 換成自己產生的標記；先用佔位字串躲過 marked / DOMPurify，所有內容都 escape。 */
 function renderWiki(el, md) {
   const out = [];
@@ -2359,10 +2672,7 @@ function renderWiki(el, md) {
     target = target.trim();
     const c = /^paper:([^#\s]+)#p(\d+)(?:@(\w+))?$/.exec(target);  // @aid：筆記裡的標註錨點
     if (c) {
-      const p = wsPaperList.find((x) => x.id === c[1]) || library.find((x) => x.id === c[1]) || (S.paper?.id === c[1] && S.paper);
-      const full = p ? p.title || p.filename : "論文";
-      out.push(`<button class="wcite" data-pid="${escapeHTML(c[1])}" data-page="${c[2]}"${c[3] ? ` data-aid="${c[3]}"` : ""} title="${escapeHTML(full)}，第 ${c[2]} 頁"
-        aria-label="開啟《${escapeHTML(full)}》第 ${c[2]} 頁">${escapeHTML(shortTitle(full))}<span class="wcp">p.${c[2]}</span></button>`);
+      out.push(citeChip(c[1], c[2], c[3]));
     } else {
       out.push(`<a class="wref" href="#" data-slug="${escapeHTML(target)}">${escapeHTML(label?.trim() || target)}</a>`);
     }

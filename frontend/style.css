@@ -74,7 +74,7 @@
   --backdrop: rgba(0, 0, 0, .55);
 }
 /* 紙面（Wiki 頁、問答回答、筆記預覽）：深色模式裡也是亮紙，紙上一律用淺色主題的字、線與燈光 */
-.wpage, .qa.assistant, .nbpreview { --ink: var(--sheet-ink); --ink-2: #5E594F; --ink-3: #8A857B; --rule: #D3D0C8; --rule-strong: #B9B5AC;
+.wpage, .qa.assistant, .nbpreview, .nbsheet { --ink: var(--sheet-ink); --ink-2: #5E594F; --ink-3: #8A857B; --rule: #D3D0C8; --rule-strong: #B9B5AC;
   --leaf: #ECEAE4; --card-bg: var(--leaf); --lamp: #A06E14; --seal: #A9452F; color: var(--ink); }
 
 * { box-sizing: border-box; }
@@ -421,12 +421,32 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .related .acts { margin-top: 6px; }
 .notes .meta .quote { margin-left: auto; } .notes .meta .quote + .del { margin-left: 0; }
 
-/* ---- 筆記分頁：桌面上的輸入區（文楷），預覽是紙面 ---- */
+/* ---- 筆記分頁：寫在一張紙上（同 Wiki 頁、問答回答）；編輯器是 CodeMirror，載不到時是 textarea ---- */
 .nbbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
 .nbbar .seg button { min-height: 32px; }
-.nbmore { margin-left: auto; display: inline-flex; gap: 6px; }
+.nbmore { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.nbtools { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px 12px; border-bottom: 1px solid var(--rule); }
+.nbtools button.icon { min-width: 32px; min-height: 32px; justify-content: center; padding: 4px 6px; }
+.nbtools .nbtx { font: 600 14px/1 var(--font-tool); }
+.nbtools .nbtx i { font-family: var(--font-head); font-size: 16px; }
+.nbsep { width: 1px; height: 18px; background: var(--rule); margin: 0 4px; }
+.nbpick { position: absolute; z-index: 30; top: calc(100% + 4px); right: 12px; width: min(380px, calc(100% - 24px)); max-height: 50vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--rule-strong); border-radius: var(--radius); box-shadow: var(--shadow-float); padding: 6px; }
+.nbpick ul { list-style: none; margin: 0; padding: 0; }
+.nbpick li button { display: flex; gap: 10px; width: 100%; text-align: left; border: none; background: none; padding: 6px 8px;
+  font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.nbpick li button:hover { background: var(--leaf); }
+.nbpick li .small { font-family: var(--font-tool); flex: none; min-width: 36px; font-variant-numeric: tabular-nums; }
+.nbpick p { margin: 6px 8px; }
+.nbhead { display: none; }
 .nbfeed { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
-.nbtext { flex: 1; min-height: 50vh; width: 100%; resize: none; background: var(--desk); font-family: var(--font-body); font-size: 15px; line-height: 1.9; padding: 12px 14px; }
+.nbbody { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.nboutline { display: none; }
+.nbsheet { display: flex; flex-direction: column; min-height: 52vh; padding: 16px 18px 48px; color: var(--ink);
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); box-shadow: var(--shadow-page); }
+.nbtext { flex: 1; width: 100%; resize: none; border: none; background: none; padding: 0; color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.9; }
+.nbtext:focus { box-shadow: none; }
 .nbpreview { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); box-shadow: var(--shadow-page);
   padding: 18px 20px; font-family: var(--font-body); font-size: 15px; line-height: 1.9; min-width: 0; }
 .nbcard { margin: 0; padding: 6px 10px; border-left: 3px solid var(--rule-strong); color: var(--ink-2); white-space: pre-wrap; }
@@ -435,7 +455,53 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .nbdraft { border: 1px dashed var(--rule-strong); border-radius: var(--radius-sm); padding: 8px 12px; }
 .nbdraft .row span { display: inline-flex; gap: 6px; align-items: center; }
 .nbdraft .md { max-height: 40vh; overflow-y: auto; font-size: 14px; line-height: 1.75; }
-.nbstatus { padding: 6px 16px; border-top: 1px solid var(--rule); min-height: 32px; }
+.nbfoot { display: flex; justify-content: space-between; gap: 12px; padding: 6px 16px; border-top: 1px solid var(--rule); min-height: 32px; }
+#nbCount { flex: none; font-variant-numeric: tabular-nums; }
+/* CodeMirror：紙上的文楷，標記淡成 --ink-3，游標不在的行藏起來 */
+#nbEditor { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#nbEditor .cm-editor { flex: 1; background: none; color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.9; }
+#nbEditor .cm-editor.cm-focused { outline: none; }
+#nbEditor .cm-scroller { font-family: inherit; line-height: inherit; overflow: visible; }
+#nbEditor .cm-content { padding: 0; min-height: 40vh; caret-color: var(--ink); }
+#nbEditor .cm-line { padding: 0; }
+#nbEditor .cm-placeholder { color: var(--ink-3); white-space: pre-wrap; }
+#nbEditor .cm-line.cm-h { font-family: var(--font-head); font-weight: 600; line-height: 1.45; padding-top: .6em; }
+#nbEditor .cm-line.cm-h1 { font-size: 25px; } #nbEditor .cm-line.cm-h2 { font-size: 20px; } #nbEditor .cm-line.cm-h3 { font-size: 16px; }
+#nbEditor .cm-line.cm-bq { border-left: 3px solid var(--rule-strong); padding-left: 14px; color: var(--ink-2); }
+#nbEditor .cm-line.cm-fence { background: var(--leaf); padding: 0 10px; font-family: ui-monospace, Consolas, monospace; font-size: 13.5px; }
+#nbEditor .cm-lm { color: var(--ink-2); font-weight: 700; }
+#nbEditor .cm-mathsrc { background: var(--leaf); border-radius: 3px; }
+#nbEditor .cm-mathblock { text-align: center; padding: .3em 0; overflow-x: auto; }
+#nbEditor .cm-tooltip { background: var(--sheet); color: var(--ink); border: 1px solid var(--rule-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow-float); }
+#nbEditor .cm-tooltip-autocomplete ul { font-family: var(--font-tool); font-size: 14px; }
+#nbEditor .cm-tooltip-autocomplete ul li { padding: 3px 10px; }
+#nbEditor .cm-tooltip-autocomplete ul li[aria-selected] { background: var(--lamp-fill); color: var(--ink); }
+#nbEditor .cm-completionDetail { color: var(--ink-2); font-style: normal; margin-left: .8em; }
+/* 展開書寫：筆記拿走大半個畫面，左邊留 PDF；紙面置中，左側一欄大綱 */
+@media (min-width: 700px) {
+  main.nbwide { --pw: min(64vw, 1120px); }
+  main.nbwide, main.nbwide.nopanel { grid-template-columns: minmax(0, 1fr) var(--pw); }
+  main.nbwide .lib { display: none; }
+  main.nbwide .nbhead { display: flex; align-items: flex-end; gap: 16px; padding: 16px 28px 10px; border-bottom: 1px solid var(--rule); }
+  .nbhead > div { flex: 1; min-width: 0; }
+  .nbhead h2 { margin: 0; font-family: var(--font-head); font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .nbhead p { margin: 4px 0 0; } .nbhead p:empty { display: none; }
+  #nbHeadStatus { flex: none; }
+  main.nbwide .nbfeed { padding: 24px 28px 40px; }
+  main.nbwide .nbfeed > :not(.nbbody), main.nbwide .nbbody { width: 100%; max-width: 1000px; margin-inline: auto; }
+  main.nbwide .nbbody { grid-template-columns: 168px minmax(0, 1fr); }
+  main.nbwide .nboutline { display: block; grid-row: 1; align-self: start; position: sticky; top: 0; max-height: 80vh; overflow-y: auto; }
+  main.nbwide .nbsheet, main.nbwide .nbpreview { grid-column: 2; grid-row: 1; }
+  main.nbwide .nbsheet { padding: 40px 56px 96px; min-height: 72vh; }
+  main.nbwide #nbEditor .cm-editor, main.nbwide .nbtext { font-size: 16px; }
+  .nboutline ul { list-style: none; margin: 6px 0 0; padding: 0; }
+  .nboutline button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 3px 6px; color: var(--ink-2);
+    font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+  .nboutline button:hover { color: var(--ink); background: var(--leaf); }
+  .nboutline .lv2 { padding-left: 16px; } .nboutline .lv3 { padding-left: 28px; }
+  .nboutline p { margin: 6px 0; }
+}
+@media (max-width: 699px) { #nbWide { display: none; } }
 #nbPrintArea { display: none; }
 
 /* ---- 內文（Markdown）：書籍排版 ---- */
