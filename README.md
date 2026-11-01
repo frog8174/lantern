@@ -133,6 +133,7 @@ curl http://localhost:8000/v1/models     # 回傳的 "id" 就是 LLM_MODEL
 | 翻譯（選字、整頁、對照） | `LLM_MODEL_TRANSLATE` | Haiku 5.5 | low（預設） | 量最大（整篇逐段），$0.10 / $0.50 每百萬 token |
 | AI 大綱 | `LLM_MODEL_OUTLINE` | Haiku 5.5 | low（預設） | 簡單的 JSON 整理 |
 | 聊天建議問題 | `LLM_MODEL_SUGGEST` | Haiku 5.5 | low（預設） | 三個短問題，每篇只跑一次 |
+| 中英對齊（螢光筆同步到譯文） | `LLM_MODEL_ALIGN` | 沒設就同翻譯 | low（預設） | 只要從一段裡抄出對應的子字串（docs/reader.md） |
 
 - 翻譯品質不滿意就把 `LLM_MODEL_TRANSLATE` 換成 `anthropic:claude-sonnet-5-5`；要省錢就把聊天、摘要也降到 Sonnet 5.5。
 - 改完打開 `/api/health`：`tasks` 列出每個元件實際用的模型，另外指定的模型也會各測一次連線。

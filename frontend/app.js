@@ -337,9 +337,9 @@ function buildPages() {
     const row = document.createElement("div");
     row.className = "prow";
     const size = `width:${w * S.scale}px;height:${h * S.scale}px`;
-    row.innerHTML = `<div class="page" data-page="${i}" style="${size}"><div class="hlLayer"></div>
+    row.innerHTML = `<div class="page" data-page="${i}" style="${size}"><div class="hlLayer"></div><div class="selLayer"></div>
         <div class="pno">${i + 1} / ${S.paper.num_pages}</div></div>
-      <div class="twin" style="${size}"><div class="trLayer"></div><div class="pno">譯 ${i + 1}</div></div>`;
+      <div class="twin" data-page="${i}" style="${size}"><div class="trLayer"></div><div class="pno">譯 ${i + 1}</div></div>`;
     wrap.appendChild(row);
     const el = $(".page", row);
     S.pages.push({ el, twin: $(".twin", row), rendered: false });
@@ -403,7 +403,7 @@ function drawHighlights(i) {
   layer.innerHTML = "";
   for (const a of S.annotations.filter((a) => a.page === i && visibleOnPage(a))) {
     const cls = AUTO[a.kind] ? a.kind.slice(5) : a.kind === "user" ? colorKey(a.color) : a.kind;
-    for (const [x0, y0, x1, y1] of a.rects) {
+    for (const [x0, y0, x1, y1] of mergeRects(a.rects)) {
       const d = document.createElement("div");
       d.className = `hl ${cls}`;
       d.dataset.id = a.id;
@@ -427,7 +427,42 @@ function drawHighlights(i) {
       layer.appendChild(m);
     }
   }
+  markTranslation(i);
 }
+
+/** 選取 / 標註的矩形 → 每行一條連續色帶。PDF.js 的 span 之間有縫，原始矩形畫出來是一格一格的：
+ *  垂直重疊的併成同一行、x 接起來（隔太遠才分開，例如雙欄）；上下兩行靠得近就切在中線，剛好相接不重疊。
+ *  存檔時和畫的時候都過一次（結果不變），舊標註不用改資料。座標是頁內 0~1 的 [x0, y0, x1, y1]。 */
+function mergeRects(rects) {
+  const lines = [];
+  for (const r of [...rects].sort((a, b) => a[1] - b[1])) {
+    const l = lines.find((l) => Math.min(l.y1, r[3]) - Math.max(l.y0, r[1]) > 0.5 * Math.min(l.y1 - l.y0, r[3] - r[1]));
+    if (l) { l.rs.push(r); l.y0 = Math.min(l.y0, r[1]); l.y1 = Math.max(l.y1, r[3]); }
+    else lines.push({ y0: r[1], y1: r[3], rs: [r] });
+  }
+  lines.sort((a, b) => a.y0 - b.y0);
+  const near = (p, n) => n.y0 - p.y1 < 0.6 * Math.min(p.y1 - p.y0, n.y1 - n.y0);
+  const ys = lines.map((l, k) => {
+    const p = lines[k - 1], n = lines[k + 1];
+    return [p && near(p, l) ? (p.y1 + l.y0) / 2 : l.y0, n && near(l, n) ? (l.y1 + n.y0) / 2 : l.y1];
+  });
+  return lines.flatMap((l, k) => {
+    const segs = [];
+    for (const r of l.rs.sort((a, b) => a[0] - b[0])) {
+      const g = segs.at(-1);
+      if (g && r[0] - g[1] < 0.025) g[1] = Math.max(g[1], r[2]);
+      else segs.push([r[0], r[2]]);
+    }
+    return segs.map(([x0, x1]) => [x0, ys[k][0], x1, ys[k][1]]);
+  });
+}
+console.assert((() => {  // 同一行兩段接成一條、上下兩行切在中線、雙欄分開；再合併一次結果不變
+  const m = mergeRects([[0.1, 0.1, 0.2, 0.12], [0.21, 0.101, 0.4, 0.12], [0.1, 0.125, 0.3, 0.145], [0.6, 0.126, 0.8, 0.145]]);
+  return m.length === 3 && m[0][2] === 0.4 && m[0][3] === m[1][1] && JSON.stringify(mergeRects(m)) === JSON.stringify(m);
+})(), "mergeRects self-check");
+
+/** 兩個 0~1 矩形重疊的面積。 */
+const overlap = (r, b) => Math.max(0, Math.min(r[2], b[2]) - Math.max(r[0], b[0])) * Math.max(0, Math.min(r[3], b[3]) - Math.max(r[1], b[1]));
 
 function visibleOnPage(a) {
   const f = S.filter;
@@ -639,19 +674,58 @@ $("#customColor").addEventListener("change", (e) => {
 });
 
 /** 讀目前的選取：文字、頁碼、頁內 0~1 座標（存標註用）、螢幕上的範圍（擺浮動元件用）。 */
+/** block：選在譯文（.trb，並排頁或疊加層）裡時是第幾個翻譯區塊，否則 null。 */
 function readSelection() {
   const sel = getSelection();
   const text = sel.toString().trim();
-  const pageEl = sel.anchorNode?.parentElement?.closest(".page");
+  const pageEl = sel.anchorNode?.parentElement?.closest(".page, .twin");
   if (!text || text.length < 2 || !pageEl || !sel.rangeCount) return null;
-  const range = sel.getRangeAt(0);
-  const pr = pageEl.getBoundingClientRect();
-  const rects = [...range.getClientRects()]
-    .filter((r) => r.width > 1 && r.height > 1 && r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2)
+  const range = sel.getRangeAt(0), trb = sel.anchorNode.parentElement.closest(".trb");
+  return { text: text.replace(/\s+/g, " "), page: +pageEl.dataset.page, rects: mergeRects(selRects(range, pageEl)),
+           box: range.getBoundingClientRect(), block: trb ? +trb.dataset.i : null };
+}
+
+/** range 落在 el（原文頁或譯文頁）上的矩形，換成 el 內 0~1 座標。 */
+function selRects(range, el) {
+  const pr = el.getBoundingClientRect();
+  return [...range.getClientRects()]
+    .filter((r) => r.width > 1 && r.height > 1 && r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2
+                   && r.left >= pr.left - 2 && r.right <= pr.right + 2)
     .map((r) => [(r.left - pr.left) / pr.width, (r.top - pr.top) / pr.height,
                  (r.right - pr.left) / pr.width, (r.bottom - pr.top) / pr.height]);
-  return { text: text.replace(/\s+/g, " "), page: +pageEl.dataset.page, rects, box: range.getBoundingClientRect() };
 }
+
+/* 選取中：原文頁改畫自己的連續選取色帶（原生 ::selection 被 span 縫隙切碎，CSS 已設透明）；
+ * 並排模式再點亮對應的區塊：選英文 → 譯文區塊亮框、原文區塊淡框；選中文也一樣兩邊都亮。 */
+let litEls = [];
+document.addEventListener("selectionchange", () => {
+  litEls.forEach((el) => (el.classList.contains("trb") ? el.classList.remove("lit") : el.remove()));
+  litEls = [];
+  const sel = getSelection();
+  const host = !sel.isCollapsed && sel.rangeCount && sel.anchorNode?.parentElement?.closest(".page, .twin");
+  const i = host ? +host.dataset.page : -1, pg = S.pages[i];
+  if (!pg) return;
+  const range = sel.getRangeAt(0), rects = mergeRects(selRects(range, host));
+  const box = (r, cls) => {
+    const d = document.createElement("div");
+    d.className = cls;
+    Object.assign(d.style, { left: `${r[0] * 100}%`, top: `${r[1] * 100}%`,
+                             width: `${(r[2] - r[0]) * 100}%`, height: `${(r[3] - r[1]) * 100}%` });
+    $(".selLayer", pg.el).appendChild(d);
+    litEls.push(d);
+  };
+  if (host === pg.el && !sel.anchorNode.parentElement.closest(".trb")) rects.forEach((r) => box(r, "sel"));
+  const blocks = S.trMode === "side" && S.tr[i];
+  if (!blocks) return;
+  const lit = host === pg.twin
+    ? $$(".trb", pg.twin).filter((d) => range.intersectsNode(d)).map((d) => +d.dataset.i)
+    : blocks.flatMap((b, k) => (b.tr && rects.some((r) => overlap(r, b.bbox) > 0) ? [k] : []));
+  for (const k of lit) {
+    const d = $(`.trb[data-i="${k}"]`, pg.twin);
+    if (d) { d.classList.add("lit"); litEls.push(d); }
+    box(blocks[k].bbox, "srcbox");
+  }
+});
 
 document.addEventListener("mouseup", (e) => {
   if (e.button !== 0 || selBar.contains(e.target) || S.cropping || crop) return;
@@ -704,8 +778,9 @@ async function selAction(act, question = "") {
   const base = `/api/papers/${S.paper.id}`;
   if (act === "copy") return navigator.clipboard.writeText(text);
   if (act === "highlight") {
-    await addAnnotation({ page, rects, color: S.hlColor, text });
-    return getSelection().removeAllRanges();
+    getSelection().removeAllRanges();
+    if (sel.block != null) return highlightTranslation(sel);
+    return alignHighlight(await addAnnotation({ page, rects, color: S.hlColor, text }));
   }
   if (act === "comment") return commentEditor(sel);
   if (act === "translate") {
@@ -925,6 +1000,30 @@ async function deleteAnnotation(a) {
   S.annotations = S.annotations.filter((x) => x.id !== a.id);
   drawHighlights(a.page);
   renderActivity();
+}
+
+/** 英文螢光筆 → 問模型譯文裡對應哪一段，存在標註上（之後不再問）。對應到重疊面積最大的翻譯區塊。
+ *  shortcut: 只在這頁譯文已經在前端翻完時同步；之後才翻的頁不會補，要補就在翻完時掃一次沒有 align 的標註。 */
+async function alignHighlight(a) {
+  const blocks = S.tr[a.page];
+  if (!blocks?.done) return;
+  const area = (b) => a.rects.reduce((s, r) => s + overlap(r, b.bbox), 0);
+  const k = blocks.reduce((best, b, j) => (b.tr && area(b) > (best < 0 ? 0 : area(blocks[best])) ? j : best), -1);
+  if (k < 0) return;
+  const r = await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
+    body: { page: a.page, block: k, quote: a.text.slice(0, 2000) } }).catch(() => ({ match: "" }));
+  a.align = { block: k, zh: r.match };
+  await api(`/api/annotations/${a.id}`, { method: "PATCH", body: { align: a.align } }).catch(() => {});
+  drawHighlights(a.page);
+}
+
+/** 在譯文上畫螢光筆：對回英文原句、標在原文頁上（譯文那段也標）；對不到就標整個原文區塊。 */
+async function highlightTranslation(sel) {
+  const { page, block, text } = sel, b = S.tr[page]?.[block];
+  if (!b) return;
+  const r = await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
+    body: { page, block, quote: text.slice(0, 2000), direction: "zh2en" } }).catch(() => ({ match: "", rects: [b.bbox] }));
+  return addAnnotation({ page, rects: r.rects, color: S.hlColor, text: r.match || text, align: { block, zh: text } });
 }
 
 /* ---------------- 圖表預覽：滑過 "Figure 3" / "Table 2" ---------------- */
@@ -1309,6 +1408,35 @@ function drawTranslation(page, idx) {
       }
       if (b.tr) { d.textContent = b.tr; d.classList.add("done"); fitText(d, b.size); }
     }
+  }
+  markTranslation(page);
+}
+
+/** 譯文裡標出螢光筆的對應段落（疊加層、並排頁都畫）。zh 是空的或在譯文裡找不到，就淡淡地標整段。 */
+function markTranslation(i) {
+  const pg = S.pages[i], blocks = S.tr[i];
+  if (!pg || !blocks) return;
+  const anns = S.annotations.filter((a) => a.page === i && a.align && visibleOnPage(a));
+  for (const d of [pg.el, pg.twin].flatMap((host) => $$(".trb.done", host))) {
+    const tr = blocks[d.dataset.i].tr, marks = [];
+    for (const a of anns.filter((a) => a.align.block === +d.dataset.i)) {
+      const at = a.align.zh ? tr.indexOf(a.align.zh) : -1;
+      marks.push(at < 0 ? [0, tr.length, a, "weak"] : [at, at + a.align.zh.length, a, ""]);
+    }
+    if (!marks.length && !d.children.length) continue;
+    d.textContent = "";
+    let pos = 0;
+    for (const [s, e, a, weak] of marks.sort((x, y) => x[0] - y[0])) {
+      if (s < pos) continue;  // shortcut: 重疊的對應段只畫先開始的那段；要疊色再拆成小段
+      const m = document.createElement("mark");
+      m.className = `trm ${weak}`;
+      m.dataset.id = a.id;
+      m.style.setProperty("--c", isHex(a.color) ? tint(a.color, 0.34) : `var(--hl-${a.color})`);
+      m.textContent = tr.slice(s, e);
+      d.append(tr.slice(pos, s), m);
+      pos = e;
+    }
+    d.append(tr.slice(pos));
   }
 }
 

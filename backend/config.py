@@ -60,10 +60,12 @@ LLM_CONCURRENCY = max(1, int(os.environ.get("LLM_CONCURRENCY", "4")))
 # 環境變數 LLM_MODEL_<元件>，例：LLM_MODEL_TRANSLATE=claude-haiku-5-5。
 # 名稱前加 "openai:" 或 "anthropic:" 可以讓這個元件換服務商，
 # 例：LLM_PROVIDER=anthropic 但 LLM_MODEL_TRANSLATE=openai:qwen3.5-9b → 翻譯走本機 vLLM（LLM_BASE_URL）
-TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest", "wiki")
+TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest", "wiki", "align")
 TASK_MODELS = {t: os.environ.get(f"LLM_MODEL_{t.upper()}", "") for t in TEXT_TASKS}
+# 中英對齊（螢光筆同步到譯文）是又小又多的工作：沒另外設就跟翻譯用同一個便宜模型
+TASK_MODELS["align"] = TASK_MODELS["align"] or TASK_MODELS["translate"]
 # 各元件的思考深度（只用在 Claude；留空 = LLM_EFFORT）。量大又單純的工作預設 low
-_EFFORT_DEFAULTS = {"translate": "low", "outline": "low", "suggest": "low"}
+_EFFORT_DEFAULTS = {"translate": "low", "outline": "low", "suggest": "low", "align": "low"}
 TASK_EFFORT = {t: os.environ.get(f"LLM_EFFORT_{t.upper()}", "") or _EFFORT_DEFAULTS.get(t, "") for t in TEXT_TASKS}
 
 # ---- 視覺模型（圖表 / 公式截圖解釋）。留空就用文字模型（若它本身支援影像）----
