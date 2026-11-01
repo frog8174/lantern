@@ -105,8 +105,8 @@ AUTH_MODE = os.environ.get("AUTH_MODE", "dev").lower()  # dev＝選測試使用�
 TEST_USERS = [u.strip() for u in os.environ.get("TEST_USERS", "alice,bob").split(",") if u.strip()]
 # OIDC（Keycloak）。OIDC_ISSUER 必須和 token 的 iss 完全一樣；PUBLIC_BASE_URL 用來組 redirect URI
 OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/")
-OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
-# 本機開發用另一把 secret（OIDC_DEV_SECRET，只放本機 .env）；上線環境沒有這個變數，照用 OIDC_CLIENT_SECRET
+# 本機開發用另一個 client（OIDC_DEV_CLIENT_ID／OIDC_DEV_SECRET，只放本機 .env）；上線環境沒有這兩個變數
+OIDC_CLIENT_ID = os.environ.get("OIDC_DEV_CLIENT_ID") or os.environ.get("OIDC_CLIENT_ID", "")
 OIDC_CLIENT_SECRET = os.environ.get("OIDC_DEV_SECRET") or os.environ.get("OIDC_CLIENT_SECRET", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:7800").rstrip("/")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
