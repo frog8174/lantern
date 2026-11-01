@@ -39,6 +39,15 @@
   <symbol id="i-lantern" viewBox="0 0 32 32"><circle cx="16" cy="3.6" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 9.6h11l-1.6-3.1h-7.8z" fill="currentColor"/><rect x="9.5" y="9.4" width="13" height="2.2" rx=".6" fill="currentColor"/><path d="M11.4 12.6h9.2c.9 1.6 1.4 3.4 1.4 5.2s-.5 3.6-1.4 5.2h-9.2c-.9-1.6-1.4-3.4-1.4-5.2s.5-3.6 1.4-5.2z" style="fill: var(--lamp)"/><path d="M10.6 12.2v11.2M21.4 12.2v11.2M16 12.2v2M16 21.4v2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14.6c1.6 1.6 2 3.2 0 5.6-2-2.4-1.6-4 0-5.6z" fill="currentColor"/><rect x="8.6" y="23.4" width="14.8" height="2.4" rx=".6" fill="currentColor"/><path d="M9.6 25.8h12.8l1.2 3.4H8.4z" fill="currentColor"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <!-- 筆記工具列 -->
+  <symbol id="i-ul" viewBox="0 0 24 24"><path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="5" cy="7" r="1.4" fill="currentColor"/><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="5" cy="17" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-ol" viewBox="0 0 24 24"><path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 5.5 5.5 4.5v5M3.8 14.2c.4-.8 2.6-.9 2.4.6-.1.8-2.4 2-2.4 3.2h2.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-math" viewBox="0 0 24 24"><path d="M17 5H7l5.5 7L7 19h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mathblock" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15.5 8h-7l3.6 4-3.6 4h7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8.5 7-5 5 5 5M15.5 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cite" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 9h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M19 11h-6V5M5 13h6v6M13 11l7-7M11 13l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <header class="top">
@@ -245,24 +254,52 @@
     <!-- 筆記：這篇論文的一份 Markdown 筆記（docs/notes-design.md），自動儲存、私人 -->
     <div class="tab" id="tab-notebook" role="tabpanel">
       <div class="nbbar">
-        <div class="seg" id="nbMode" role="group" aria-label="編輯或預覽">
-          <button data-m="edit" class="on" aria-pressed="true">編輯</button><button data-m="preview" aria-pressed="false">預覽</button></div>
+        <div class="seg" id="nbMode" role="group" aria-label="書寫或閱讀">
+          <button data-m="edit" class="on" aria-pressed="true">書寫</button><button data-m="preview" aria-pressed="false" title="唯讀的排版結果">閱讀</button></div>
         <button id="nbDraft" class="small" title="依這篇的標註、備註與 AI 解釋擬一份初稿，按「插入」才會放進筆記">AI 擬初稿</button>
-        <span class="nbmore"><button id="nbExport" class="link small">匯出 .md</button><button id="nbPrint" class="link small">列印</button></span>
+        <span class="nbmore"><button id="nbExport" class="link small">匯出 .md</button><button id="nbPrint" class="link small">列印</button>
+          <button id="nbWide" class="icon" title="展開書寫（Esc 收回）" aria-label="展開書寫" aria-pressed="false"><svg aria-hidden="true"><use href="#i-expand"/></svg></button></span>
+      </div>
+      <!-- 展開書寫時才顯示：論文標題、作者年份、存檔狀態 -->
+      <header class="nbhead" id="nbHead">
+        <div><h2 id="nbTitle"></h2><p id="nbMeta" class="small muted"></p></div>
+        <span id="nbHeadStatus" class="small muted" aria-hidden="true"></span>
+      </header>
+      <!-- 格式工具列：title 與快捷鍵由 app.js 的 NB_CMDS 填 -->
+      <div class="nbtools" id="nbTools" role="toolbar" aria-label="筆記格式">
+        <button class="icon nbtx" data-cmd="h1">H1</button><button class="icon nbtx" data-cmd="h2">H2</button><button class="icon nbtx" data-cmd="h3">H3</button>
+        <span class="nbsep"></span>
+        <button class="icon nbtx" data-cmd="bold"><b>B</b></button><button class="icon nbtx" data-cmd="italic"><i>I</i></button>
+        <button class="icon" data-cmd="code"><svg aria-hidden="true"><use href="#i-code"/></svg></button>
+        <button class="icon" data-cmd="link"><svg aria-hidden="true"><use href="#i-link"/></svg></button>
+        <span class="nbsep"></span>
+        <button class="icon" data-cmd="ul"><svg aria-hidden="true"><use href="#i-ul"/></svg></button><button class="icon" data-cmd="ol"><svg aria-hidden="true"><use href="#i-ol"/></svg></button>
+        <button class="icon" data-cmd="quote"><svg aria-hidden="true"><use href="#i-quote"/></svg></button>
+        <span class="nbsep"></span>
+        <button class="icon" data-cmd="math"><svg aria-hidden="true"><use href="#i-math"/></svg></button><button class="icon" data-cmd="mathblock"><svg aria-hidden="true"><use href="#i-mathblock"/></svg></button>
+        <button class="icon" data-cmd="cite" aria-haspopup="true"><svg aria-hidden="true"><use href="#i-cite"/></svg></button>
+        <div id="nbCitePick" class="nbpick" hidden></div>
       </div>
       <div class="feed nbfeed">
         <p id="nbCardNote" class="nbcard small" hidden></p>
+        <p id="nbPlain" class="small muted" hidden>格式化編輯器載入失敗（連不到 CDN），先用純文字編輯；筆記照常自動儲存。</p>
         <div id="nbMsg" class="nbmsg small" role="alert" hidden></div>
         <section id="nbDraftBox" class="nbdraft" hidden>
           <div class="row"><b class="small">AI 草稿（還沒放進筆記）</b>
             <span><button id="nbInsert" class="small" disabled>插入</button><button id="nbDraftClose" class="link small">關閉</button></span></div>
           <div id="nbDraftOut" class="md"></div>
         </section>
-        <textarea id="nbText" class="nbtext" aria-label="這篇論文的筆記（Markdown）" spellcheck="false"
-          placeholder="寫下你對這篇的想法…支援 Markdown 與 $公式$。&#10;在 PDF 選字按「引用」（Q），或在「標註」分頁按「引用」，會把原文和可點回的連結放進來。"></textarea>
-        <div id="nbPreview" class="nbpreview" hidden></div>
+        <div class="nbbody">
+          <nav id="nbOutline" class="nboutline" aria-label="筆記大綱"></nav>
+          <div class="nbsheet" id="nbSheet">
+            <div id="nbEditor"></div>
+            <textarea id="nbText" class="nbtext" aria-label="這篇論文的筆記（Markdown）" spellcheck="false"
+              placeholder="寫下你對這篇的想法…支援 Markdown 與 $公式$。&#10;在 PDF 選字按「引用」（Q），或在「標註」分頁按「引用」，會把原文和可點回的連結放進來。"></textarea>
+          </div>
+          <div id="nbPreview" class="nbpreview" hidden></div>
+        </div>
       </div>
-      <div id="nbStatus" class="nbstatus small muted" role="status"></div>
+      <div class="nbfoot small"><span id="nbStatus" class="muted" role="status"></span><span id="nbCount" class="muted"></span></div>
     </div>
 
     <!-- 文獻：參考文獻、相關論文 -->

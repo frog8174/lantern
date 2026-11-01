@@ -9,7 +9,14 @@
 - 分頁：原「我的筆記」改名「標註」（內部 key 仍是 `notes`，`openPanel("notes")` 等呼叫不動）；新增「筆記」分頁（key `notebook`，`#tab-notebook`）。
 - 資料：`notes(id, user_id, paper_id, markdown, created, updated)`，唯一索引 `(user_id, paper_id)`；沒有 `title`、`workspace_id`（之後做主題筆記再加）。刪論文連帶刪筆記（`db.delete_paper`）。
 - API：`GET/PUT /api/papers/{pid}/note`、`POST /api/papers/{pid}/note/draft`（SSE）。PUT 帶 `base_updated`，用條件式 UPDATE 比對，不符回 409 + 伺服器那份；markdown 上限 1,000,000 字（422）。
-- 編輯：原生 textarea（文楷 15px／1.9）＋「編輯｜預覽」，預覽用 `renderWiki()`（同 Wiki 的 `[[…]]` 轉換，多解析 `@aid`）、紙面樣式。頂端唯讀顯示論文卡備註。
+- 編輯（2026-11 改版）：**CodeMirror 6 即時排版**，寫在一張紙上（`.nbsheet`，同 Wiki 頁／問答回答的紙面 token，深淺主題都是亮紙）。標題放大用標題字體、粗斜體、引用區塊左線、清單符號、程式碼區塊底色；游標不在的那一行藏起 `#` `**` `>` `` ` `` 標記，`$…$`／`$$…$$` 用 KaTeX 排好，`[[paper:<pid>#p<n>(@<aid>)]]` 顯示成跟 Wiki 一樣的晶片（`citeChip()`，短標題＋頁碼），點了 `openAt()` 跳頁閃標註；游標一碰到就露出原文。編輯器沒有焦點時整份都排好。Markdown 原文是唯一的資料，裝飾只是顯示。
+  - 載入：`app.js` 用動態 `import()` 從 esm.sh 拿，版本釘死：`@codemirror/state@6.7.6`、`view@6.43.15`、`language@6.13.1`、`commands@6.11.1`、`autocomplete@6.20.4`、`lang-markdown@6.5.2`、`@lezer/common@1.5.5`、`@lezer/highlight@1.2.5`、`@lezer/markdown@1.8.1`。每個套件只帶「它自己依賴的」`?deps=`，這樣產生的網址和套件之間互相 import 的網址完全相同，全頁只有一份 `@codemirror/state`（`CM_URLS`）。傳遞依賴裡的 `lang-html`、`style-mod`、`crelt` 等由 esm.sh 依版本範圍解析，沒有釘死。
+  - 備援：CDN 載不到就留在原生 textarea（工具列、快捷鍵、引用、自動儲存都照常），上方一行淡字說明。兩種編輯器都經過 `nbGet`／`nbSet`／`nbSel`／`nbReplace`／`nbLock`。
+  - 組字：CodeMirror 自己處理 IME；自動儲存一樣在 `compositionstart`～`compositionend` 之間不計時不存（`EditorView.domEventHandlers`）。程式換整份內容（載入、改用另一份）不備份、不進復原紀錄。
+- 工具列：H1／H2／H3、粗體、斜體、程式碼、連結、項目清單、編號清單、引用區塊、行內公式、公式區塊、插入標註引用（從這篇的標註挑一則，同「引用」）。快捷鍵 Ctrl/⌘+B、I、K；行首打 `/` 跳出同一組動作的選單（CodeMirror autocomplete）。都定義在 `NB_CMDS`。
+- 展開書寫（工具列右側按鈕，Esc 收回）：`main.nbwide`，筆記佔 64vw（最多 1120px），PDF 留在左邊、左欄大綱收起；標頭顯示論文標題、作者（前三位）與年份（`/cite` 書目，只在展開時拿）、存檔狀態；左側一欄筆記大綱（# 標題，點了捲到那裡）。選擇記在 `lantern.nbWide`，只在「筆記」分頁開著時生效；浮動面板會先停靠。手機寬度不提供。
+- 底列：存檔狀態＋字數（中日韓每字一字、其他文字以詞計，引用標記不算），一般側欄與展開時都有。
+- 「閱讀」（原「預覽」）：唯讀的 `renderWiki()` 排版結果，保留但退居次要。頂端唯讀顯示論文卡備註。
 - 自動儲存：停手 1 秒、失焦、切到別的瀏覽器分頁、切到預覽、換論文時存；`compositionstart`～`compositionend` 之間不計時不存。一次只送一個 PUT。每次變動先寫 `localStorage`（`lantern.note.<pid>`），存成功才清；下次打開若備份與伺服器不同，提示「還原那份／不用了」。409 時暫停自動儲存，提示「用我這份／改用另一份（我這份先複製到剪貼簿）」。
 - 引用：選字列「引用」（快捷鍵 **Q**）與右鍵選單「引用到筆記」→ `> 原文\n> [[paper:<pid>#p<n>]]`（選字還沒有標註，只連到頁）；「標註」分頁每則（含解釋、註解）的「引用」→ 帶 `@<aid>`，非解釋類附上使用者備註。預覽點引用 → `openAt()` 跳頁並閃標註（標註已刪就只跳頁）。
 - AI 擬初稿：task `note`（`LLM_MODEL_NOTE`），素材＝螢光筆／自動標註／註解／AI 解釋（依頁碼排序，超過 `LLM_CONTEXT_TOKENS` 一半就截斷並註明）＋有快取的摘要；沒有任何標註時直接回提示、不打模型。草稿串在分頁裡的草稿框，按「插入」才放進游標處。
@@ -18,14 +25,14 @@
 - 列印／存 PDF：把渲染好的筆記放進 `#nbPrintArea`，`@media print` 只印它。
 
 **延後**
-- 寬版左右並排、格式工具列與 Ctrl+B/I/K 快捷鍵、`[[` 自動完成、版本紀錄、研究主題筆記、.docx、自訂模板、擬稿素材勾選（目前全用）、論文卡「有筆記」標記、筆記全文搜尋。
+- `[[` 自動完成、版本紀錄、研究主題筆記、.docx、自訂模板、擬稿素材勾選（目前全用）、論文卡「有筆記」標記、筆記全文搜尋。
 - 匯出時 `[[slug]]`（Wiki 連結）原樣保留，沒換成標題。
 
 ## 0. 一句話結論
 **MVP 不引入編輯器套件**：用原生 `<textarea>`（霞鶩文楷）＋ 既有的 `renderMD()`（marked + DOMPurify + KaTeX）做「編輯｜預覽」切換與寬版左右對照，
 加上 Lantern 自己才有的東西：**一鍵把標註／AI 解釋引用進筆記，引用可點回 PDF 那一頁那一段**，以及「AI 從我的標註擬初稿」。
 中文輸入法（注音、倉頡、拼音的選字組字）是這個功能的命脈，原生 textarea 是唯一保證零問題的選項；其他編輯器的好處（語法上色、所見即所得）都換不回這個風險。
-之後若真的需要語法上色，再升級到 CodeMirror 6（esm.sh + import map），資料格式不用改。
+之後若真的需要語法上色，再升級到 CodeMirror 6（esm.sh + import map），資料格式不用改。（2026-11 已升級，見上方「實作狀態」；改用 `?deps=` 釘版本而非 import map。）
 
 ---
 
