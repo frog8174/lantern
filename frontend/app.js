@@ -743,9 +743,28 @@ setPanelWidth(+store.get("lantern.panelW", 380));
 // 展開書寫另有一個寬度（--nb-w），拖曳時改的是目前這個模式的寬度，各自記住
 const setNbWidth = (w) => mainEl.style.setProperty("--nb-w", `${w}px`);
 if (store.get("lantern.nbW", "")) setNbWidth(+store.get("lantern.nbW", ""));
+const setPanelHeight = (h) => mainEl.style.setProperty("--panel-h", `${h}px`);
+if (store.get("lantern.panelH", "")) setPanelHeight(+store.get("lantern.panelH", ""));
+const panelAtBottom = () => mainEl.classList.contains("bottompanel") && !mainEl.matches(".nbwide, .floatpanel") && innerWidth >= 700;
 $("#panelGrip").addEventListener("mousedown", (e) => {
   e.preventDefault();
   const grip = e.currentTarget, wide = mainEl.classList.contains("nbwide");
+  if (panelAtBottom()) {  // 停在下方：上下拖曳改高度
+    grip.classList.add("dragging");
+    let h = panelEl.offsetHeight, raf = 0;
+    const move = (ev) => {
+      h = Math.round(Math.min(innerHeight * 0.75, Math.max(160, mainEl.getBoundingClientRect().bottom - ev.clientY)));
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; setPanelHeight(h); });
+    };
+    const up = () => {
+      grip.classList.remove("dragging");
+      cancelAnimationFrame(raf); setPanelHeight(h); store.set("lantern.panelH", h);
+      removeEventListener("mousemove", move); removeEventListener("mouseup", up);
+    };
+    addEventListener("mousemove", move);
+    addEventListener("mouseup", up);
+    return;
+  }
   grip.classList.add("dragging");
   let w = panelEl.offsetWidth;
   let raf = 0;  // 拖曳時每一幀最多改一次寬度：改欄寬會讓整份 PDF 重新排版，滑鼠事件比畫面更新頻繁得多
@@ -769,6 +788,19 @@ function setPanelFloat(on) {
   store.set("lantern.panelFloat", on ? "1" : "");
 }
 $("#panelFloat").onclick = () => setPanelFloat(true);
+// 停在右側 ↔ 下方（記在這台瀏覽器）；收起用頂列同一個面板鈕再打開
+function setPanelBottom(on) {
+  mainEl.classList.toggle("bottompanel", on);
+  const b = $("#panelBottom"), t = on ? "移回右側" : "移到閱讀區下方";
+  b.title = t; b.setAttribute("aria-label", t);
+  $("use", b).setAttribute("href", on ? "#i-dock-right" : "#i-dock-bottom");
+  $("#panelGrip").title = on ? "拖曳調整高度" : "拖曳調整寬度";
+  $("#panelGrip").setAttribute("aria-orientation", on ? "horizontal" : "vertical");
+  store.set("lantern.panelBottom", on ? "1" : "");
+}
+$("#panelBottom").onclick = () => setPanelBottom(!mainEl.classList.contains("bottompanel"));
+if (store.get("lantern.panelBottom", "")) setPanelBottom(true);
+$("#panelHide").onclick = () => { setPanelFloat(false); mainEl.classList.add("nopanel"); $("#togglePanel").focus(); };
 $("#panelDock").onclick = () => setPanelFloat(false);
 makeDraggable(panelEl, $(".phead", panelEl));
 if (store.get("lantern.panelFloat", "")) setPanelFloat(true);
