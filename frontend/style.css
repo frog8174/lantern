@@ -477,9 +477,9 @@ input[type="checkbox"] { accent-color: var(--ink); }
 #nbEditor .cm-tooltip-autocomplete ul li { padding: 3px 10px; }
 #nbEditor .cm-tooltip-autocomplete ul li[aria-selected] { background: var(--lamp-fill); color: var(--ink); }
 #nbEditor .cm-completionDetail { color: var(--ink-2); font-style: normal; margin-left: .8em; }
-/* 展開書寫：筆記拿走大半個畫面，左邊留 PDF；紙面置中，左側一欄大綱 */
+/* 展開書寫：筆記拿畫面不到一半，論文頁仍有足夠寬度；大綱是半透明的小卡，浮在紙面右上角，不佔版面 */
 @media (min-width: 700px) {
-  main.nbwide { --pw: min(64vw, 1120px); }
+  main.nbwide { --pw: min(46vw, 820px); }
   main.nbwide, main.nbwide.nopanel { grid-template-columns: minmax(0, 1fr) var(--pw); }
   main.nbwide .lib { display: none; }
   main.nbwide .nbhead { display: flex; align-items: flex-end; gap: 16px; padding: 16px 28px 10px; border-bottom: 1px solid var(--rule); }
@@ -487,17 +487,23 @@ input[type="checkbox"] { accent-color: var(--ink); }
   .nbhead h2 { margin: 0; font-family: var(--font-head); font-size: 20px; font-weight: 600; line-height: 1.3; }
   .nbhead p { margin: 4px 0 0; } .nbhead p:empty { display: none; }
   #nbHeadStatus { flex: none; }
-  main.nbwide .nbfeed { padding: 24px 28px 40px; }
-  main.nbwide .nbfeed > :not(.nbbody), main.nbwide .nbbody { width: 100%; max-width: 1000px; margin-inline: auto; }
-  main.nbwide .nbbody { grid-template-columns: 168px minmax(0, 1fr); }
-  main.nbwide .nboutline { display: block; grid-row: 1; align-self: start; position: sticky; top: 0; max-height: 80vh; overflow-y: auto; }
-  main.nbwide .nbsheet, main.nbwide .nbpreview { grid-column: 2; grid-row: 1; }
-  main.nbwide .nbsheet { padding: 40px 56px 96px; min-height: 72vh; }
+  main.nbwide .nbfeed { padding: 20px 24px 40px; }
+  main.nbwide .nbfeed > :not(.nbbody), main.nbwide .nbbody { width: 100%; max-width: 760px; margin-inline: auto; }
+  main.nbwide .nbbody { display: block; }
+  /* 浮動大綱：sticky + 右浮動 + 負左邊界＝跟著捲動停在紙的右上角，但不推開內文；平常淡，滑過才清楚 */
+  main.nbwide .nboutline { display: block; position: sticky; top: 10px; z-index: 3; float: right; width: 176px; margin: 10px 10px 0 -186px;
+    max-height: 60vh; overflow-y: auto; padding: 6px 4px; border-radius: var(--radius); border: 1px solid rgba(35, 33, 30, .08);
+    background: rgba(255, 255, 255, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity: .45; transition: opacity .2s; color: #5E594F; }
+  main.nbwide .nboutline:is(:hover, :focus-within) { opacity: 1; background: rgba(255, 255, 255, .88); }
+  main.nbwide .nboutline p { padding: 0 6px; font-size: 12px; }
+
+  main.nbwide .nbsheet { padding: 36px 44px 96px; min-height: 72vh; }
   main.nbwide #nbEditor .cm-editor, main.nbwide .nbtext { font-size: 16px; }
   .nboutline ul { list-style: none; margin: 6px 0 0; padding: 0; }
-  .nboutline button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 3px 6px; color: var(--ink-2);
-    font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
-  .nboutline button:hover { color: var(--ink); background: var(--leaf); }
+  .nboutline button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 3px 6px; color: #5E594F;
+    font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+  .nboutline button:hover { color: #23211E; background: rgba(35, 33, 30, .06); }
   .nboutline .lv2 { padding-left: 16px; } .nboutline .lv3 { padding-left: 28px; }
   .nboutline p { margin: 6px 0; }
 }
