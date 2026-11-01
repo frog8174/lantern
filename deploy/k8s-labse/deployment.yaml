@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labse
+  labels: { app: labse }
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # RWO 的模型快取 PVC 不能同時掛兩個 Pod
+  selector:
+    matchLabels: { app: labse }
+  template:
+    metadata:
+      labels: { app: labse }
+    spec:
+      # 指定 GPU 節點：改成有 GPU 的那台（kubectl get nodes）
+      nodeSelector:
+        kubernetes.io/hostname: GPU_NODE        # TODO: 例如 toolmen-server2
+      # 指定第一張卡：不向 device plugin 要 nvidia.com/gpu（那樣拿到哪張卡由排程決定），
+      # 改用 NVIDIA container runtime 直接掛 GPU 0。代價：這張卡不會被 k8s 記成「已占用」，可能和別的工作共用；
+      # LaBSE 很小（fp16 約 1 GB），所以下面把 vLLM 的顯存上限壓低。
+      # 叢集若有 RuntimeClass "nvidia" 就保留下一行；若 docker 的預設 runtime 已經是 nvidia，可以刪掉。
+      runtimeClassName: nvidia
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.10.2       # 釘版本；換版前先在本機驗證（docs/labse.md）
+          args:
+            - --model=sentence-transformers/LaBSE
+            - --served-model-name=labse
+            - --runner=pooling
+            - --convert=embed
+            - --dtype=float16
+            - --max-model-len=512               # LaBSE 上限 512 token；一句一筆，夠用
+            - --gpu-memory-utilization=0.10     # 和其他工作共用這張卡，只拿 10% 顯存
+            - --port=8000
+          env:
+            - { name: NVIDIA_VISIBLE_DEVICES, value: "0" }   # 第一張卡
+            - { name: CUDA_VISIBLE_DEVICES, value: "0" }
+            - name: VLLM_API_KEY                             # 有 Ingress 對外，所以一定要 key
+              valueFrom: { secretKeyRef: { name: labse-secrets, key: VLLM_API_KEY } }
+            - { name: HF_HOME, value: /cache/huggingface }
+          ports:
+            - { name: http, containerPort: 8000 }
+          volumeMounts:
+            - { name: hf-cache, mountPath: /cache }
+            - { name: shm, mountPath: /dev/shm }
+          startupProbe:                       # 第一次要下載模型，給 10 分鐘
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests: { memory: 4Gi }
+            limits: { memory: 8Gi }
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim: { claimName: hf-cache }
+        - name: shm
+          emptyDir: { medium: Memory, sizeLimit: 2Gi }

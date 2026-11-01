@@ -1,0 +1,22 @@
+# 對外（本機開發用）：https://labse.toolmen.bime.ntu.edu.tw/v1/embeddings，要帶 Authorization: Bearer <VLLM_API_KEY>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: labse
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: cert-manager-prod
+spec:
+  ingressClassName: traefik-private
+  tls:
+    - hosts: [labse.toolmen.bime.ntu.edu.tw]     # TODO: 確認網域
+      secretName: labse-tls
+  rules:
+    - host: labse.toolmen.bime.ntu.edu.tw
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: labse, port: { name: http } }

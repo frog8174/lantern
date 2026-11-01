@@ -1,0 +1,9 @@
+# 叢集內：Lantern 用 http://labse.embedding.svc.cluster.local:8000/v1 呼叫，不經過 Ingress
+apiVersion: v1
+kind: Service
+metadata:
+  name: labse
+spec:
+  selector: { app: labse }
+  ports:
+    - { name: http, port: 8000, targetPort: http }

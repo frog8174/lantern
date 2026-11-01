@@ -1,0 +1,11 @@
+# LaBSE 句向量服務（vLLM，OpenAI 相容 /v1/embeddings）。給 Lantern 做中英逐句對齊，之後也可給語意搜尋用。
+# 部署：先建 Secret（見 docs/labse.md），再 kubectl apply -k deploy/k8s-labse
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: embedding
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
