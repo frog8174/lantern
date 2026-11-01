@@ -998,9 +998,16 @@ function placeFloating(el, anchor, width) {
   } else if (below >= 280) {
     el.style.top = `${anchor.bottom + 10}px`; el.style.bottom = "";
     el.style.maxHeight = `${below - 10}px`;
-  } else {
+  } else if (anchor.top - 70 >= 280) {
     el.style.top = ""; el.style.bottom = `${innerHeight - anchor.top + 10}px`;
-    el.style.maxHeight = `${Math.max(240, anchor.top - 70)}px`;
+    el.style.maxHeight = `${anchor.top - 70}px`;
+  } else {
+    // 上下都放不下（例如框了一張很高的圖）：改放在旁邊，頂端對齊但不超出畫面
+    const right = anchor.right + 12, left = anchor.left - width - 12;
+    el.style.left = `${right + width <= innerWidth - 12 ? right : left >= 12 ? left : Math.max(12, innerWidth - width - 12)}px`;
+    const top = Math.min(Math.max(64, anchor.top), innerHeight - 320);
+    el.style.top = `${Math.max(8, top)}px`; el.style.bottom = "";
+    el.style.maxHeight = `${innerHeight - Math.max(8, top) - 16}px`;
   }
 }
 
