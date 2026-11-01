@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS cache (
 );
 CREATE TABLE IF NOT EXISTS annotations (
   id TEXT PRIMARY KEY, paper_id TEXT, page INTEGER, rects TEXT, color TEXT,
-  text TEXT, comment TEXT, kind TEXT, created REAL
+  text TEXT, comment TEXT, kind TEXT, created REAL, align TEXT DEFAULT 'null'
 );
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT, paper_id TEXT, role TEXT, content TEXT, created REAL
@@ -87,6 +87,9 @@ def init() -> None:
             c.execute("ALTER TABLE papers ADD COLUMN starred INTEGER DEFAULT 0")
         if "sha256" not in cols:  # 重複偵測用；舊論文沒有，靠 DOI／標題比對
             c.execute("ALTER TABLE papers ADD COLUMN sha256 TEXT")
+        # annotations 加上中英對齊結果（譯文裡對應的那段，docs/reader.md）
+        if "align" not in {r["name"] for r in c.execute("PRAGMA table_info(annotations)")}:
+            c.execute("ALTER TABLE annotations ADD COLUMN align TEXT DEFAULT 'null'")
         # 測試使用者：user id = 名字
         c.executemany("INSERT OR IGNORE INTO users (id, name, created) VALUES (?,?,?)",
                       [(u, u, time.time()) for u in config.TEST_USERS])
@@ -375,18 +378,19 @@ def cache_set(pid: str, kind: str, value, key: str = "") -> None:
 
 # ---------- annotations ----------
 def add_annotation(pid: str, a: dict) -> dict:
-    a = {"id": new_id(), "created": time.time(), "comment": "", "kind": "user", **a}
+    a = {"id": new_id(), "created": time.time(), "comment": "", "kind": "user", "align": None, **a}
     with conn() as c:
-        c.execute("INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?)",
+        c.execute("INSERT INTO annotations (id, paper_id, page, rects, color, text, comment, kind, created, align)"
+                  " VALUES (?,?,?,?,?,?,?,?,?,?)",
                   (a["id"], pid, a["page"], json.dumps(a["rects"]), a.get("color", "yellow"),
-                   a.get("text", ""), a["comment"], a["kind"], a["created"]))
+                   a.get("text", ""), a["comment"], a["kind"], a["created"], json.dumps(a["align"], ensure_ascii=False)))
     return a
 
 
 def list_annotations(pid: str) -> list[dict]:
     with conn() as c:
         rows = c.execute("SELECT * FROM annotations WHERE paper_id=? ORDER BY page, created", (pid,)).fetchall()
-    return [{**dict(r), "rects": json.loads(r["rects"])} for r in rows]
+    return [{**dict(r), "rects": json.loads(r["rects"]), "align": json.loads(r["align"] or "null")} for r in rows]
 
 
 def annotation_paper(aid: str) -> str | None:
@@ -395,9 +399,12 @@ def annotation_paper(aid: str) -> str | None:
     return r["paper_id"] if r else None
 
 
-def update_annotation(aid: str, comment: str) -> None:
+def update_annotation(aid: str, comment: str | None = None, align: dict | None = None) -> None:
     with conn() as c:
-        c.execute("UPDATE annotations SET comment=? WHERE id=?", (comment, aid))
+        if comment is not None:
+            c.execute("UPDATE annotations SET comment=? WHERE id=?", (comment, aid))
+        if align is not None:
+            c.execute("UPDATE annotations SET align=? WHERE id=?", (json.dumps(align, ensure_ascii=False), aid))
 
 
 def delete_annotation(aid: str) -> None:

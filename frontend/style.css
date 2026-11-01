@@ -223,7 +223,10 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
 .twin { display: none; }
 #pages.tr-side .twin { display: block; }
 .page canvas, .twin canvas { display: block; }
-.page .hlLayer, .page .cropLayer { position: absolute; inset: 0; pointer-events: none; }
+.page .hlLayer, .page .cropLayer, .page .selLayer { position: absolute; inset: 0; pointer-events: none; }
+/* 選取中的連續色帶（取代被 span 縫隙切碎的原生選取色）與並排模式對應的原文區塊淡框 */
+.selLayer .sel { position: absolute; background: var(--lamp-fill); mix-blend-mode: multiply; }
+.selLayer .srcbox { position: absolute; border-radius: 2px; box-shadow: 0 0 0 3px rgba(232, 184, 92, .55); }
 .page .hl { position: absolute; border-radius: 1px; mix-blend-mode: multiply; }
 .page .hl.yellow { background: var(--hl-yellow); } .page .hl.green { background: var(--hl-green); }
 .page .hl.blue { background: var(--hl-blue); } .page .hl.pink { background: var(--hl-pink); }
@@ -278,7 +281,7 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
 .textLayer { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-size-adjust: none; forced-color-adjust: none;
   transform-origin: 0 0; z-index: 2; }
 .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-.textLayer ::selection { background: rgba(232, 184, 92, .40); }
+.textLayer ::selection { background: transparent; }  /* 改由 .selLayer .sel 畫 */
 
 /* 翻譯層：疊加模式蓋在原文頁上（滑過變透明看原文）；並排模式畫在右邊的譯文頁 */
 .trLayer { position: absolute; inset: 0; z-index: 3; display: none; }
@@ -289,6 +292,12 @@ main.nopanel, main.floatpanel { grid-template-columns: 240px minmax(0, 1fr); }
   background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
 .trb.done { background: #FBF9F4; box-shadow: 0 0 0 2px #FBF9F4; }
 .page .trb.done:hover { opacity: .06; }
+/* 並排模式：選到的段落在譯文頁亮燈光框 */
+.trb.done.lit { box-shadow: 0 0 0 2px #FBF9F4, 0 0 0 3.5px var(--lamp);
+  background-image: linear-gradient(rgba(232, 184, 92, .14), rgba(232, 184, 92, .14)); }
+/* 螢光筆同步到譯文：--c 是標註顏色；對不到原句時整段淡淡標 */
+.trb .trm { background: var(--c); color: inherit; padding: 0; }
+.trb .trm.weak { background: color-mix(in srgb, var(--c) 45%, transparent); }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .trErr { position: absolute; top: 8px; left: 8px; right: 8px; padding: 6px 10px; background: #FBF9F4; border-left: 3px solid var(--seal);
   color: #A9452F; font-size: 14px; }

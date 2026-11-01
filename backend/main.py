@@ -512,6 +512,40 @@ async def _block_translation(p: dict, page: int) -> AsyncIterator[str]:
         db.cache_set(pid, "block_translation", blocks, key)
 
 
+class AlignIn(BaseModel):
+    page: int
+    block: int
+    quote: str = Field(min_length=1, max_length=2000)
+    direction: Literal["en2zh", "zh2en"] = "en2zh"
+
+
+@app.post("/api/papers/{pid}/align")
+async def align(pid: str, uid: Uid, body: AlignIn):
+    """中英對齊：在對照翻譯的同一個區塊裡，找出 quote 對應的那段。
+    回傳 {"match": 對應段落（必是子字串，找不到為 ""）, "fallback": 是否只能標整段}；
+    zh2en 另回 "rects"：英文原句在頁上的位置（找不到就是整個區塊）。"""
+    p = _paper_or_404(pid, uid)
+    blocks = db.cache_get(pid, "block_translation", str(body.page)) or []
+    if not 0 <= body.block < len(blocks) or not blocks[body.block].get("tr"):
+        raise HTTPException(409, "translation not ready")
+    b = blocks[body.block]
+    src, dst = (b["text"], b["tr"]) if body.direction == "en2zh" else (b["tr"], b["text"])
+    key = f"{body.page}:{body.block}:{body.direction}:{body.quote}"
+    match = db.cache_get(pid, "align", key)
+    if match is None:
+        match = await features.align_span(src, dst, body.quote)
+        if match:  # 失敗的不快取：可能只是暫時連不上
+            db.cache_set(pid, "align", match, key)
+    out = {"match": match, "fallback": not match}
+    if body.direction == "zh2en":
+        x0, y0, x1, y1 = b["bbox"]
+        hits = await asyncio.to_thread(pdf_parse.find_text_rects, _pdf_path(pid), body.page, match) if match else []
+        # 同一句可能在頁上出現好幾次，只留這個區塊裡的
+        out["rects"] = [r for r in hits if x0 - .01 <= (r[0] + r[2]) / 2 <= x1 + .01
+                        and y0 - .01 <= (r[1] + r[3]) / 2 <= y1 + .01] or [b["bbox"]]
+    return out
+
+
 _bg_tasks: set[asyncio.Task] = set()
 _translating: set[str] = set()  # 背景翻譯中的論文 id（卡片進度圈用）
 
@@ -746,6 +780,12 @@ async def suggestions(pid: str, uid: Uid):
     return cached
 
 # ---------------- 註解 ----------------
+class AlignMark(BaseModel):
+    """螢光筆在譯文裡的對應：第 block 個翻譯區塊裡的 zh 這段（空字串 = 標整段）。"""
+    block: int = Field(ge=0)
+    zh: str = Field("", max_length=4000)
+
+
 class AnnotIn(BaseModel):
     page: int
     rects: list[list[float]]
@@ -754,6 +794,7 @@ class AnnotIn(BaseModel):
     text: str = ""
     comment: str = ""  # 螢光筆的備註；kind=explain 時存 AI 的解釋（含追問）；kind=comment 時是註解內容
     kind: Literal["user", "explain", "comment"] = "user"  # auto:* 只能由自動標註產生
+    align: AlignMark | None = None
 
 
 @app.get("/api/papers/{pid}/annotations")
@@ -769,7 +810,8 @@ def add_annotation(pid: str, uid: Uid, body: AnnotIn):
 
 
 class CommentIn(BaseModel):
-    comment: str
+    comment: str | None = None
+    align: AlignMark | None = None
 
 
 def _own_annotation(aid: str, uid: str) -> None:
@@ -782,7 +824,7 @@ def _own_annotation(aid: str, uid: str) -> None:
 @app.patch("/api/annotations/{aid}")
 def edit_annotation(aid: str, body: CommentIn, uid: Uid):
     _own_annotation(aid, uid)
-    db.update_annotation(aid, body.comment)
+    db.update_annotation(aid, body.comment, body.align.model_dump() if body.align else None)
     return {"ok": True}
 
 

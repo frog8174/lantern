@@ -161,6 +161,25 @@ async def stream_block_translation(paper: dict, blocks: list[dict]) -> AsyncIter
 
 
 # ---------------- 圖片 / 公式截圖解釋（需要視覺模型）----------------
+async def align_span(src: str, dst: str, quote: str) -> str:
+    """quote 是 src 裡的一段；回傳 dst 裡意思對應的那段，必須是 dst 的子字串，否則回空字串（呼叫端改標整段）。"""
+    if config.LLM_MOCK:
+        return dst[: max(1, len(dst) // 3)]
+    msgs = [
+        {"role": "system", "content":
+            "你負責中英對照論文的對齊。給你段落 A、它的對照段落 B，以及 A 裡的一段引文。"
+            "只輸出 B 裡跟引文意思對應的那一段，必須從 B 逐字複製（連標點都一樣），"
+            "不要加引號、不要說明。找不到對應就輸出空白。"},
+        {"role": "user", "content": f"A：\n{src}\n\nB：\n{dst}\n\n引文：\n{quote}"},
+    ]
+    try:
+        out = await llm.complete(msgs, task="align", temperature=0.0)
+    except Exception:
+        return ""
+    out = out.strip().strip("\"'「」“”")
+    return out if out and out in dst else ""
+
+
 def image_messages(paper: dict, image_data_url: str, page: int, question: str, history: str = "") -> list:
     q = question or "請解釋這張圖（或這條公式）：它呈現什麼、怎麼讀、和論文主張的關係。"
     return [
