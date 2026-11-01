@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793538875.3256526,
-    "seen": 1793538895.6535912,
-    "ast_hash": "a7cb7643e9c3bec41406087a65ea1b02",
+    "mtime": 1793540123.5183308,
+    "seen": 1793540154.168296,
+    "ast_hash": "916a10914517910130540470bc3cfe58",
     "semantic_hash": ""
   },
   "pyproject.toml": {

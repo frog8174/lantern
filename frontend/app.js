@@ -724,6 +724,7 @@ function smoothZoom(f, cx, cy, delay = 160) {
   zoomPend = Math.min(3 / S.scale, Math.max(0.5 / S.scale, zoomPend * f));
   wrap.style.transition = "transform .12s ease-out";
   wrap.style.transform = `scale(${zoomPend})`;
+  wrap.classList.add("zooming");  // 紙外標籤字級固定，縮放中先淡出，定案後在新位置淡入
   $("#zoomLabel").textContent = `${Math.round(S.scale * zoomPend * 100)}%`;
   clearTimeout(zoomT);
   zoomT = setTimeout(() => {
@@ -731,6 +732,7 @@ function smoothZoom(f, cx, cy, delay = 160) {
     zoomPend = 1; zoomAt = null;
     wrap.style.transition = wrap.style.transform = "";
     zoom(g, at);
+    setTimeout(() => wrap.classList.remove("zooming"), 30);  // 隔一下才拿掉，新畫的標籤才有淡入（rAF 在背景分頁會停）
   }, delay);
 }
 const viewerCenter = () => { const r = $("#viewer").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
@@ -2734,7 +2736,7 @@ $("#wsSort").onchange = (e) => { wsSort = e.target.value; store.set("lantern.wsS
 /** 用 wsPaperList 畫卡片；focusId + sel 指定重畫後焦點放回哪顆按鈕。 */
 function paintWsCards(focusId, sel) {
   const del = curWs ? "移出這個研究主題（論文本身保留）" : "刪除這篇論文";
-  $("#wsPapers").innerHTML = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}${p.translating || p.fetching_bib ? " busy" : ""}" data-id="${escapeHTML(p.id)}">
+  const html = [...wsPaperList].sort(SORTS[wsSort]).map((p) => `<div class="card${p.starred ? " starred" : ""}${p.translating || p.fetching_bib ? " busy" : ""}" data-id="${escapeHTML(p.id)}">
       <img class="cthumb" src="/api/papers/${encodeURIComponent(p.id)}/thumb.png" alt="" loading="lazy">
       <div class="cbody">
       <button class="copen">${escapeHTML(p.title || p.filename)}</button>
@@ -2747,9 +2749,30 @@ function paintWsCards(focusId, sel) {
         <button class="cact cnote-btn" aria-expanded="false" title="${p.note ? "編輯備註" : "寫備註"}"><svg aria-hidden="true"><use href="#i-pen"/></svg>備註</button>
         <button class="cact ccite" aria-haspopup="dialog" title="複製引用格式"><svg aria-hidden="true"><use href="#i-quote"/></svg>引用</button>
       </span></div></div>${trRing(p)}
-      <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`).join("")
-    || `<p class="cards-empty">${sisyphus("rest", 240, "wm")}<span>${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</span></p>`;
+      <button class="cdel" title="${del}" aria-label="${del}">×</button></div>`);
+  const box = $("#wsPapers");
+  if (!html.length) box.innerHTML = `<p class="cards-empty">${sisyphus("rest", 240, "wm")}<span>${curWs ? "這個研究主題還沒有論文：上傳 PDF、匯入 arXiv，或加入既有論文。" : "還沒有論文：上傳 PDF 或匯入 arXiv 開始。"}</span></p>`;
+  else patchCards(box, html);
   if (focusId) $(`#wsPapers .card[data-id="${CSS.escape(focusId)}"] ${sel}`)?.focus();
+}
+/** 背景輪詢每 4 秒重畫一次：整片 innerHTML 會讓縮圖重新載入閃一下、進度圈的動畫接不上。
+ *  只換內容有變的卡片，沒變的原地不動；換掉的卡片沿用原本的縮圖元素。 */
+const cardHTML = new WeakMap();
+function patchCards(box, html) {
+  const old = new Map($$(".card[data-id]", box).map((c) => [c.dataset.id, c]));
+  const next = html.map((h) => {
+    const t = document.createElement("template");
+    t.innerHTML = h.trim();
+    const c = t.content.firstElementChild, o = old.get(c.dataset.id);
+    if (o && cardHTML.get(o) === h) return o;
+    cardHTML.set(c, h);
+    if (o) $(".cthumb", c).replaceWith($(".cthumb", o));
+    return c;
+  });
+  const cur = [...box.children];
+  if (cur.length === next.length && cur.every((c, i) => old.get(next[i].dataset.id) === c)) {
+    next.forEach((c, i) => { if (c !== cur[i]) cur[i].replaceWith(c); });  // 順序沒變：只換有變的那幾張
+  } else box.replaceChildren(...next);
 }
 const cardPaper = (id) => wsPaperList.find((x) => x.id === id);
 // 回傳 {tags, note, starred}；寫回目前清單裡那一筆（輪詢可能已經換掉清單物件）
