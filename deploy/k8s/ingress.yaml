@@ -9,7 +9,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     cert-manager.io/cluster-issuer: cert-manager-prod   # cert-manager 依 spec.tls 建立 lantern-tls
 spec:
-  ingressClassName: traefik   # 確認：kubectl get ingressclass
+  ingressClassName: traefik-private   # 叢集上的 IngressClass（kubectl get ingressclass）
   tls:
     - hosts: [lantern.toolmen.bime.ntu.edu.tw]
       secretName: lantern-tls
