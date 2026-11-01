@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793506272.1336353,
-    "seen": 1793506289.36852,
-    "ast_hash": "a66a52182d3665f802c1cf332dbe97a3",
+    "mtime": 1793506654.99538,
+    "seen": 1793506697.8606317,
+    "ast_hash": "929af5fafdedd2124500533739bb1fe1",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -121,9 +121,9 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793504308.113859,
-    "seen": 1793504435.014687,
-    "ast_hash": "7b932437745421bf5f11c50dcf31869e",
+    "mtime": 1793506600.7221084,
+    "seen": 1793506697.8606317,
+    "ast_hash": "06febbc1f45a86958dc9e01d8411b246",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
@@ -175,9 +175,9 @@
     "semantic_hash": ""
   },
   "docs/design.md": {
-    "mtime": 1793505934.9119477,
-    "seen": 1793506289.36852,
-    "ast_hash": "8e13f2fc9ef92443e984cf4b24e3f341",
+    "mtime": 1793506695.2685041,
+    "seen": 1793506697.8606317,
+    "ast_hash": "86ccee2ac026aef58357f49b98697337",
     "semantic_hash": ""
   },
   "docs/ux-round1.md": {
