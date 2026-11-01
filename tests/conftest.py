@@ -44,6 +44,7 @@ os.environ.update({
     "OCR_ENABLED": "true",
     "EMBED_BASE_URL": "", "EMBED_API_KEY": "",
     "EMBED_MODEL": "emb-a",
+    "ALIGN_EMBED_URL": "",              # 逐句對應表預設關閉；test_sentalign 自己開
     "LLM_CONTEXT_TOKENS": "500",        # 故意很小：聊天一定走 RAG + embedding 檢索
     "LLM_CONCURRENCY": "2",
     "DISABLE_THINKING": "true",

@@ -47,7 +47,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import cite, config, db, features, llm, pdf_parse, retrieval
+from . import cite, config, db, features, llm, pdf_parse, retrieval, sentalign
 from .pdf_parse import parse_pdf
 
 app = FastAPI(title="Paper Reader")
@@ -512,6 +512,60 @@ async def _block_translation(p: dict, page: int) -> AsyncIterator[str]:
         yield json.dumps(item, ensure_ascii=False)
     if not failed:
         db.cache_set(pid, "block_translation", blocks, key)
+        # 翻完就在背景算逐句對應表；不擋翻譯串流
+        task = asyncio.create_task(_align_map(pid, page, blocks))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+
+
+def _in_block(rects: list, bbox: list) -> list:
+    """同一句可能在頁上出現好幾次，只留中心落在這個區塊裡的。"""
+    x0, y0, x1, y1 = bbox
+    return [r for r in rects if x0 - .01 <= (r[0] + r[2]) / 2 <= x1 + .01 and y0 - .01 <= (r[1] + r[3]) / 2 <= y1 + .01]
+
+
+_amap_jobs: dict[str, asyncio.Task] = {}  # 同一頁同一版譯文只算一次（背景與前端請求撞在一起時）
+
+
+async def _align_map(pid: str, page: int, blocks: list[dict]) -> dict:
+    """這頁的逐句對應表（快取 kind align_map；譯文變了雜湊就不同，自動重算）。沒設定或失敗回 {}。"""
+    if not config.ALIGN_EMBED_URL:
+        return {}
+    h = hashlib.sha1(json.dumps([[b["text"], b.get("tr", "")] for b in blocks], ensure_ascii=False).encode()).hexdigest()
+    cached = db.cache_get(pid, "align_map", str(page))
+    if cached and cached["h"] == h:
+        return cached["blocks"]
+    jk = f"{pid}:{page}:{h}"
+    if jk not in _amap_jobs:
+        _amap_jobs[jk] = asyncio.create_task(_build_align_map(pid, page, blocks, h))
+        _amap_jobs[jk].add_done_callback(lambda _: _amap_jobs.pop(jk, None))
+    return await asyncio.shield(_amap_jobs[jk])
+
+
+async def _build_align_map(pid: str, page: int, blocks: list[dict], h: str) -> dict:
+    try:
+        amap = await sentalign.page_map(blocks)
+        # 英文句在原文頁上的位置先算好，選中文時不用再問伺服器
+        pairs = [(b, p) for k, ps in amap.items() for b in [blocks[int(k)]] for p in ps]
+        hits = await asyncio.to_thread(pdf_parse.find_texts_rects, _pdf_path(pid), page,
+                                       [b["text"][p["en"][0]:p["en"][1]] for b, p in pairs])
+    except Exception as e:  # 端點掛了不影響閱讀：前端退回問 LLM；不印例外內容以免帶出設定
+        status = getattr(getattr(e, "response", None), "status_code", "")
+        print(f"[align-map] {pid} p.{page}: failed: {type(e).__name__} {status}")
+        return {}
+    for (b, p), rs in zip(pairs, hits):
+        p["rects"] = _in_block(rs, b["bbox"]) or [b["bbox"]]
+    db.cache_set(pid, "align_map", {"h": h, "blocks": amap}, str(page))
+    return amap
+
+
+@app.get("/api/papers/{pid}/align-map")
+async def align_map(pid: str, uid: Uid, page: int):
+    """逐句對應表 {"blocks": {區塊序號: [{"en": [s,e], "zh": [s,e], "score", "rects"}]}}。
+    位置是 b.text / b.tr 的字元索引。還沒翻完、沒設定 LaBSE 或端點失敗都回空的 blocks。"""
+    _paper_or_404(pid, uid)
+    blocks = db.cache_get(pid, "block_translation", str(page))
+    return {"blocks": await _align_map(pid, page, blocks) if blocks else {}}
 
 
 class AlignIn(BaseModel):
@@ -540,11 +594,8 @@ async def align(pid: str, uid: Uid, body: AlignIn):
             db.cache_set(pid, "align", match, key)
     out = {"match": match, "fallback": not match}
     if body.direction == "zh2en":
-        x0, y0, x1, y1 = b["bbox"]
         hits = await asyncio.to_thread(pdf_parse.find_text_rects, _pdf_path(pid), body.page, match) if match else []
-        # 同一句可能在頁上出現好幾次，只留這個區塊裡的
-        out["rects"] = [r for r in hits if x0 - .01 <= (r[0] + r[2]) / 2 <= x1 + .01
-                        and y0 - .01 <= (r[1] + r[3]) / 2 <= y1 + .01] or [b["bbox"]]
+        out["rects"] = _in_block(hits, b["bbox"]) or [b["bbox"]]
     return out
 
 
