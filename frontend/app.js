@@ -2661,6 +2661,7 @@ $("#wsPapers").onclick = async (e) => {
   if (!armDelete(del)) return;
   try { await api(curWs ? `/api/workspaces/${curWs.id}/papers/${id}` : `/api/papers/${id}`, { method: "DELETE" }); }
   catch (err) { $("#wsStatus").textContent = `${curWs ? "移出" : "刪除"}失敗：${err.message}`; return; }
+  delete del.dataset.armed;  // 還上膛的按鈕會讓 cardsBusy() 擋掉重畫，刪掉的卡片就留在畫面上
   showWs();
 };
 
