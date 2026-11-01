@@ -25,5 +25,8 @@ data:
   LLM_MODEL_SUGGEST: anthropic:claude-haiku-5-5
   OCR_ENABLED: "true"
   OCR_MODEL: anthropic:claude-sonnet-5-5
+  # 逐句對應的 LaBSE（docs/labse.md）；金鑰 ALIGN_EMBED_API_KEY 放 Secret
+  ALIGN_EMBED_URL: http://labse.aaron-personal.svc.cluster.local:8000/v1
+  ALIGN_EMBED_MODEL: labse
   TARGET_LANG: 繁體中文（台灣用語）
   SEMANTIC_SCHOLAR_LOOKUP: "true"

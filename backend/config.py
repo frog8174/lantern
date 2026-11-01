@@ -89,6 +89,11 @@ EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "") or LLM_BASE_URL
 EMBED_API_KEY = os.environ.get("EMBED_API_KEY", "") or LLM_API_KEY
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "")
 
+# ---- 逐句對應用的 LaBSE 句向量（docs/labse.md）。URL 留空 = 不做，選字時改問 LLM ----
+ALIGN_EMBED_URL = os.environ.get("ALIGN_EMBED_URL", "")
+ALIGN_EMBED_MODEL = os.environ.get("ALIGN_EMBED_MODEL", "labse")
+ALIGN_EMBED_API_KEY = os.environ.get("ALIGN_EMBED_API_KEY", "")
+
 # ---- 其他 ----
 TARGET_LANG = os.environ.get("TARGET_LANG", "繁體中文（台灣用語）")
 DATA_DIR = Path(os.environ.get("DATA_DIR", ROOT / "data"))

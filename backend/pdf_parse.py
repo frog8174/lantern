@@ -369,7 +369,12 @@ def match_author_year(refs: dict[str, str], author: str, year: str) -> str | Non
 
 
 def find_text_rects(path: str, page_no: int, needle: str) -> list[list[float]]:
-    """在指定頁找一段文字，回傳正規化矩形。給自動標註、引用定位用。
+    """在指定頁找一段文字，回傳正規化矩形。給自動標註、引用定位用。"""
+    return find_texts_rects(path, page_no, [needle])[0]
+
+
+def find_texts_rects(path: str, page_no: int, needles: list[str]) -> list[list[list[float]]]:
+    """一次找好幾段（逐句對應表要整頁的句子），PDF 只開一次。
 
     LLM 抄回來的句子常跟原文有些微差異（空白、連字號），所以：
     先找整句 → 找不到就切成幾段短的分別找。
@@ -378,18 +383,21 @@ def find_text_rects(path: str, page_no: int, needle: str) -> list[list[float]]:
     try:
         page = doc[page_no]
         w, h = page.rect.width, page.rect.height
-        needle = re.sub(r"\s+", " ", needle).strip()
-        candidates = [needle]
-        words = needle.split(" ")
-        if len(words) > 10:
-            candidates += [" ".join(words[i: i + 8]) for i in range(0, len(words) - 4, 8)]
-        rects: list[list[float]] = []
-        for cand in candidates:
-            hits = page.search_for(cand)
-            if hits:
-                rects += [[r.x0 / w, r.y0 / h, r.x1 / w, r.y1 / h] for r in hits]
-                if cand is needle:
-                    break
-        return rects
+        out = []
+        for needle in needles:
+            needle = re.sub(r"\s+", " ", needle).strip()
+            candidates = [needle]
+            words = needle.split(" ")
+            if len(words) > 10:
+                candidates += [" ".join(words[i: i + 8]) for i in range(0, len(words) - 4, 8)]
+            rects: list[list[float]] = []
+            for cand in candidates:
+                hits = page.search_for(cand)
+                if hits:
+                    rects += [[r.x0 / w, r.y0 / h, r.x1 / w, r.y1 / h] for r in hits]
+                    if cand is needle:
+                        break
+            out.append(rects)
+        return out
     finally:
         doc.close()

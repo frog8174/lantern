@@ -278,7 +278,7 @@ async function openPaper(id) {
   loadSideList().catch(() => {});
   loadNote(id);
   S.annotations = await api(`/api/papers/${id}/annotations`);
-  S.tr = {}; S.trQueue = []; S.figures = []; S.refs = [];
+  S.tr = {}; S.amap = {}; S.trQueue = []; S.figures = []; S.refs = [];
   api(`/api/papers/${id}/figures`).then((f) => { S.figures = f; }).catch(() => {});
   api(`/api/papers/${id}/references`).then((r) => { S.refs = r; renderRefs(); }).catch(() => {});
   $("#paperTitle").textContent = S.paper.title;
@@ -803,8 +803,9 @@ document.addEventListener("selectionchange", () => {
   }
 });
 
-/* 並排模式的逐句對應：選完字（放開滑鼠）後問 /align，對方那邊只亮「對應的那句」，取代整段的淡框。
- * 英→中：譯文裡那段用燈光色 mark 標出（借 markTranslation 畫）；中→英：原文頁畫出那句的位置。結果有伺服器快取。 */
+/* 並排模式的逐句對應：選完字（放開滑鼠）後，對方那邊只亮「對應的那句」，取代整段的淡框。
+ * 先查這頁的逐句對應表（S.amap，LaBSE 算的，即時）；表裡對不到才問 /align（LLM，有伺服器快取）。
+ * 英→中：譯文裡那段用燈光色 mark 標出（借 markTranslation 畫）；中→英：原文頁畫出那句的位置。 */
 let litAlign = null, litJob = 0;
 function clearLitAlign() {
   litJob++;
@@ -820,9 +821,10 @@ async function correspond(sel) {
   const area = (b) => sel.rects.reduce((s, r) => s + overlap(r, b.bbox), 0);
   const k = fromZh ? sel.block : blocks.reduce((best, b, j) => (b.tr && area(b) > (best < 0 ? 0 : area(blocks[best])) ? j : best), -1);
   if (k < 0 || !blocks[k]?.tr) return;
-  const job = ++litJob, pid = S.paper.id, pg = S.pages[sel.page];
-  const r = await api(`/api/papers/${pid}/align`, { method: "POST",
-    body: { page: sel.page, block: k, quote: sel.text.slice(0, 2000), direction: fromZh ? "zh2en" : "en2zh" } }).catch(() => null);
+  const job = ++litJob, pid = S.paper.id, pg = S.pages[sel.page], pairs = mapPairs(sel.page, k, sel.text, fromZh);
+  const r = pairs ? { match: blocks[k].tr.slice(...spanOf(pairs, "zh")), rects: pairs.flatMap((p) => p.rects) }
+    : await api(`/api/papers/${pid}/align`, { method: "POST",
+      body: { page: sel.page, block: k, quote: sel.text.slice(0, 2000), direction: fromZh ? "zh2en" : "en2zh" } }).catch(() => null);
   if (job !== litJob || S.paper?.id !== pid || !r?.match) return;  // 選取已經換了，或對不到（保留整段淡框）
   litEls.filter((el) => el.classList.contains("srcbox") || el.classList.contains("trb"))
     .forEach((el) => (el.classList.contains("trb") ? el.classList.remove("lit") : el.remove()));
@@ -840,6 +842,40 @@ async function correspond(sel) {
     markTranslation(sel.page);
   }
 }
+
+/** 逐句對應表（後端用 LaBSE 算好、快取）。拿不到就不放，選字時退回問 LLM。 */
+async function loadAlignMap(page) {
+  const pid = S.paper.id;
+  const r = await api(`/api/papers/${pid}/align-map?page=${page}`).catch(() => null);
+  if (S.paper?.id === pid && r?.blocks && Object.keys(r.blocks).length) S.amap[page] = r.blocks;
+}
+
+/** 選取的字落在區塊原文（fromZh 時是譯文）的哪裡 → 重疊到的句對；對不到回 null。
+ *  textLayer 的空白、行尾斷字跟 b.text 不一樣，兩邊都去掉空白和連字號再找；
+ *  整段找不到（選取跨到別的區塊）就用頭尾各 20 字定位。 */
+function mapPairs(page, k, text, fromZh) {
+  const pairs = S.amap?.[page]?.[k], b = S.tr[page]?.[k];
+  if (!pairs?.length || !b?.tr) return null;
+  const src = fromZh ? b.tr : b.text, skip = /[\s\-‐]/, at = [];
+  let flat = "";
+  for (let i = 0; i < src.length; i++) if (!skip.test(src[i])) { flat += src[i]; at.push(i); }
+  const q = text.replace(/[\s\-‐]/g, "");
+  if (!q) return null;
+  // shortcut: 很短的選取（如 "the"）在區塊裡重複出現時取第一個；要更準得用選取在 textLayer 裡的位置
+  let s = flat.indexOf(q), e = s + q.length;
+  if (s < 0) {
+    const head = flat.indexOf(q.slice(0, 20)), tail = flat.indexOf(q.slice(-20));
+    if (head < 0 && tail < 0) return null;
+    s = Math.max(0, head);
+    e = tail < 0 ? flat.length : tail + Math.min(20, q.length);
+    if (e <= s) return null;
+  }
+  const from = at[s], to = at[e - 1] + 1, side = fromZh ? "zh" : "en";
+  const hit = pairs.filter((p) => p[side][0] < to && p[side][1] > from);
+  return hit.length ? hit : null;
+}
+/** 幾個句對在某一邊涵蓋的範圍（句對是照順序的，連續選幾句就是連續的一段）。 */
+const spanOf = (pairs, side) => [Math.min(...pairs.map((p) => p[side][0])), Math.max(...pairs.map((p) => p[side][1]))];
 
 document.addEventListener("mouseup", (e) => {
   $$(".textLayer.selecting").forEach((t) => t.classList.remove("selecting"));
@@ -1132,8 +1168,10 @@ async function alignHighlight(a) {
   const area = (b) => a.rects.reduce((s, r) => s + overlap(r, b.bbox), 0);
   const k = blocks.reduce((best, b, j) => (b.tr && area(b) > (best < 0 ? 0 : area(blocks[best])) ? j : best), -1);
   if (k < 0) return;
-  const r = await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
-    body: { page: a.page, block: k, quote: a.text.slice(0, 2000) } }).catch(() => ({ match: "" }));
+  const pairs = mapPairs(a.page, k, a.text, false);  // 對應表對得到就不問 LLM
+  const r = pairs ? { match: blocks[k].tr.slice(...spanOf(pairs, "zh")) }
+    : await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
+      body: { page: a.page, block: k, quote: a.text.slice(0, 2000) } }).catch(() => ({ match: "" }));
   a.align = { block: k, zh: r.match };
   await api(`/api/annotations/${a.id}`, { method: "PATCH", body: { align: a.align } }).catch(() => {});
   drawHighlights(a.page);
@@ -1143,8 +1181,10 @@ async function alignHighlight(a) {
 async function highlightTranslation(sel) {
   const { page, block, text } = sel, b = S.tr[page]?.[block];
   if (!b) return;
-  const r = await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
-    body: { page, block, quote: text.slice(0, 2000), direction: "zh2en" } }).catch(() => ({ match: "", rects: [b.bbox] }));
+  const pairs = mapPairs(page, block, text, true);
+  const r = pairs ? { match: b.text.slice(...spanOf(pairs, "en")), rects: pairs.flatMap((p) => p.rects) }
+    : await api(`/api/papers/${S.paper.id}/align`, { method: "POST",
+      body: { page, block, quote: text.slice(0, 2000), direction: "zh2en" } }).catch(() => ({ match: "", rects: [b.bbox] }));
   return addAnnotation({ page, rects: r.rects, color: S.hlColor, text: r.match || text, align: { block, zh: text } });
 }
 
@@ -1490,8 +1530,9 @@ async function pumpTranslation() {
       else { blocks[ev.i].tr = ev.tr; drawTranslation(page, ev.i); }
     });
     if (S.paper?.id === pid && S.tr[page]) { blocks.done = true; drawTranslation(page); }
-    // 翻譯前就畫好的螢光筆，現在補同步到譯文
-    if (S.paper?.id === pid) S.annotations.filter((x) => x.page === page && (x.kind === "user" || AUTO[x.kind]) && !x.align).forEach(alignHighlight);
+    // 拿逐句對應表（不擋下一頁翻譯）；拿到後再把翻譯前就畫好的螢光筆補同步到譯文，能查表就不問 LLM
+    if (S.paper?.id === pid) loadAlignMap(page).then(() => S.annotations
+      .filter((x) => x.page === page && (x.kind === "user" || AUTO[x.kind]) && !x.align).forEach(alignHighlight));
   } catch (e) {
     delete S.tr[page];
     const pg = S.pages[page];
