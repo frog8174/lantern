@@ -73,8 +73,8 @@
   --shadow-float: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
   --backdrop: rgba(0, 0, 0, .55);
 }
-/* 紙面（Wiki 頁、問答回答）：深色模式裡也是亮紙，紙上一律用淺色主題的字、線與燈光 */
-.wpage, .qa.assistant { --ink: var(--sheet-ink); --ink-2: #5E594F; --ink-3: #8A857B; --rule: #D3D0C8; --rule-strong: #B9B5AC;
+/* 紙面（Wiki 頁、問答回答、筆記預覽）：深色模式裡也是亮紙，紙上一律用淺色主題的字、線與燈光 */
+.wpage, .qa.assistant, .nbpreview { --ink: var(--sheet-ink); --ink-2: #5E594F; --ink-3: #8A857B; --rule: #D3D0C8; --rule-strong: #B9B5AC;
   --leaf: #ECEAE4; --card-bg: var(--leaf); --lamp: #A06E14; --seal: #A9452F; color: var(--ink); }
 
 * { box-sizing: border-box; }
@@ -313,7 +313,7 @@ main.floatpanel .panel { position: fixed; z-index: 22; right: 24px; top: 72px; w
   border-radius: var(--radius-dlg); box-shadow: var(--shadow-float); }
 main.floatpanel .phead { display: flex; }
 main.floatpanel .pgrip, main.floatpanel .pfloat { display: none; }
-/* 四個文字分頁，目前分頁底下一道燈光線 */
+/* 五個文字分頁，目前分頁底下一道燈光線 */
 .tabs { display: flex; align-items: stretch; gap: 20px; border-bottom: 1px solid var(--rule); padding: 0 8px 0 20px; }
 .tabs button[data-tab] { border: none; border-radius: 0; background: none; padding: 12px 0 10px; min-height: var(--tap); color: var(--ink-2);
   border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; margin-bottom: -1px; white-space: nowrap; }
@@ -387,6 +387,24 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .related a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .related details { margin-top: 4px; color: var(--ink-2); } .related summary { cursor: pointer; color: var(--ink-2); }
 .related .acts { margin-top: 6px; }
+.notes .meta .quote { margin-left: auto; } .notes .meta .quote + .del { margin-left: 0; }
+
+/* ---- 筆記分頁：桌面上的輸入區（文楷），預覽是紙面 ---- */
+.nbbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
+.nbbar .seg button { min-height: 32px; }
+.nbmore { margin-left: auto; display: inline-flex; gap: 6px; }
+.nbfeed { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
+.nbtext { flex: 1; min-height: 50vh; width: 100%; resize: none; background: var(--desk); font-family: var(--font-body); font-size: 15px; line-height: 1.9; padding: 12px 14px; }
+.nbpreview { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); box-shadow: var(--shadow-page);
+  padding: 18px 20px; font-family: var(--font-body); font-size: 15px; line-height: 1.9; min-width: 0; }
+.nbcard { margin: 0; padding: 6px 10px; border-left: 3px solid var(--rule-strong); color: var(--ink-2); white-space: pre-wrap; }
+.nbmsg { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-left: 3px solid var(--lamp); background: var(--leaf); }
+.nbmsg span { flex-basis: 100%; }
+.nbdraft { border: 1px dashed var(--rule-strong); border-radius: var(--radius-sm); padding: 8px 12px; }
+.nbdraft .row span { display: inline-flex; gap: 6px; align-items: center; }
+.nbdraft .md { max-height: 40vh; overflow-y: auto; font-size: 14px; line-height: 1.75; }
+.nbstatus { padding: 6px 16px; border-top: 1px solid var(--rule); min-height: 32px; }
+#nbPrintArea { display: none; }
 
 /* ---- 內文（Markdown）：書籍排版 ---- */
 .md { font-family: var(--font-tool); overflow-wrap: anywhere; min-width: 0; position: relative; }
@@ -866,3 +884,12 @@ a.wref:hover { text-decoration-style: solid; }
   background: var(--panel); color: var(--ink); font-size: 14px; }
 .toast[hidden] { display: none; }
 .toast.offline { right: auto; bottom: auto; top: 16px; left: 50%; transform: translateX(-50%); width: max-content; color: var(--ink-2); }
+
+/* 筆記「列印」：只印 #nbPrintArea（白紙黑字、文楷），其他全藏 */
+@media print {
+  html:has(body.printnote), body.printnote { height: auto; overflow: visible; background: #fff; color: #23211E; display: block; }
+  body.printnote > *:not(#nbPrintArea) { display: none !important; }
+  body.printnote #nbPrintArea { display: block; --ink: #23211E; --ink-2: #5E594F; --rule: #D3D0C8; color: #23211E;
+    font-family: var(--font-body); font-size: 12pt; line-height: 1.8; }
+  body.printnote #nbPrintArea .wcite { border: none; background: none; padding: 0; color: #5E594F; }
+}

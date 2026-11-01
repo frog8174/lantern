@@ -1,6 +1,25 @@
 # 筆記本：在 Lantern 裡寫自己的論文筆記（設計稿）
 
-狀態：設計稿，尚未實作。寫給使用者決定方向，也寫給之後實作的人當規格起點。
+狀態：MVP 已實作（見文末「實作狀態」）。以下為原設計稿，第 6 節的開放問題已由使用者決定。
+
+## 實作狀態（2026-11）
+使用者的決定：每人每篇一份筆記、不做研究主題筆記；另開第五個分頁；匯出只做 .md 並附可點回 Lantern 的網址；不做模板、擬稿用一個預設 prompt；筆記不餵給 Wiki／問答；論文卡備註維持獨立。
+
+**已做**
+- 分頁：原「我的筆記」改名「標註」（內部 key 仍是 `notes`，`openPanel("notes")` 等呼叫不動）；新增「筆記」分頁（key `notebook`，`#tab-notebook`）。
+- 資料：`notes(id, user_id, paper_id, markdown, created, updated)`，唯一索引 `(user_id, paper_id)`；沒有 `title`、`workspace_id`（之後做主題筆記再加）。刪論文連帶刪筆記（`db.delete_paper`）。
+- API：`GET/PUT /api/papers/{pid}/note`、`POST /api/papers/{pid}/note/draft`（SSE）。PUT 帶 `base_updated`，用條件式 UPDATE 比對，不符回 409 + 伺服器那份；markdown 上限 1,000,000 字（422）。
+- 編輯：原生 textarea（文楷 15px／1.9）＋「編輯｜預覽」，預覽用 `renderWiki()`（同 Wiki 的 `[[…]]` 轉換，多解析 `@aid`）、紙面樣式。頂端唯讀顯示論文卡備註。
+- 自動儲存：停手 1 秒、失焦、切到別的瀏覽器分頁、切到預覽、換論文時存；`compositionstart`～`compositionend` 之間不計時不存。一次只送一個 PUT。每次變動先寫 `localStorage`（`lantern.note.<pid>`），存成功才清；下次打開若備份與伺服器不同，提示「還原那份／不用了」。409 時暫停自動儲存，提示「用我這份／改用另一份（我這份先複製到剪貼簿）」。
+- 引用：選字列「引用」（快捷鍵 **Q**）與右鍵選單「引用到筆記」→ `> 原文\n> [[paper:<pid>#p<n>]]`（選字還沒有標註，只連到頁）；「標註」分頁每則（含解釋、註解）的「引用」→ 帶 `@<aid>`，非解釋類附上使用者備註。預覽點引用 → `openAt()` 跳頁並閃標註（標註已刪就只跳頁）。
+- AI 擬初稿：task `note`（`LLM_MODEL_NOTE`），素材＝螢光筆／自動標註／註解／AI 解釋（依頁碼排序，超過 `LLM_CONTEXT_TOKENS` 一半就截斷並註明）＋有快取的摘要；沒有任何標註時直接回提示、不打模型。草稿串在分頁裡的草稿框，按「插入」才放進游標處。
+- 匯出 .md：前端組，YAML frontmatter（title、authors、year、doi——取 `/cite` 書目，拿不到就略；source、exported），`[[paper:…#pN@aid]]` 換成 `[p.N](<origin>/#<pid>/pN/<aid>)`。
+- 深連結：網址 `#<pid>/p<n>/<aid>` 開論文、跳頁、閃標註（啟動與 `hashchange` 都處理）；`#<pid>` 照舊。
+- 列印／存 PDF：把渲染好的筆記放進 `#nbPrintArea`，`@media print` 只印它。
+
+**延後**
+- 寬版左右並排、格式工具列與 Ctrl+B/I/K 快捷鍵、`[[` 自動完成、版本紀錄、研究主題筆記、.docx、自訂模板、擬稿素材勾選（目前全用）、論文卡「有筆記」標記、筆記全文搜尋。
+- 匯出時 `[[slug]]`（Wiki 連結）原樣保留，沒換成標題。
 
 ## 0. 一句話結論
 **MVP 不引入編輯器套件**：用原生 `<textarea>`（霞鶩文楷）＋ 既有的 `renderMD()`（marked + DOMPurify + KaTeX）做「編輯｜預覽」切換與寬版左右對照，

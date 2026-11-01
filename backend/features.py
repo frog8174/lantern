@@ -233,6 +233,41 @@ def summary_messages(paper: dict) -> list:
     ]
 
 
+# ---------------- 論文筆記：AI 從標註擬初稿（docs/notes-design.md 4.9）----------------
+_NOTE_KIND = {"user": "螢光筆", "comment": "註解", "explain": "AI 解釋"}
+
+
+def note_draft_messages(paper: dict, annots: list[dict], summary: str | None) -> list | None:
+    """素材 = 標註、註解、AI 解釋（＋有快取的摘要）。一則素材都沒有回 None。"""
+    lines, used, budget, cut = [], 0, config.LLM_CONTEXT_TOKENS * 0.5, False
+    for a in sorted(annots, key=lambda a: (a["page"], a["created"])):  # 超過預算就依頁碼順序截斷
+        kind = _NOTE_KIND.get(a["kind"]) or ("自動標註" if a["kind"].startswith("auto:") else None)
+        if not kind:
+            continue
+        line = f"- [[paper:{paper['id']}#p{a['page'] + 1}@{a['id']}]]（{kind}）原文：{a['text'][:600]}"
+        if (a.get("comment") or "").strip():
+            line += f"\n  {'AI 的解釋' if a['kind'] == 'explain' else '我的備註'}：{a['comment'][:800]}"
+        if lines and used + _est_tokens(line) > budget:
+            cut = True
+            break
+        lines.append(line)
+        used += _est_tokens(line)
+    if not lines:
+        return None
+    material = "\n".join(lines) + ("\n（素材太多，後面幾頁的已省略）" if cut else "")
+    if summary:
+        material += f"\n\n論文摘要（參考用）：\n{summary[:3000]}"
+    return [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content":
+            f"{_header(paper)}\n\n以下是我讀這篇時留下的標註與備註：\n{material}\n\n---\n"
+            f"請用{LANG}、Markdown 幫我擬一份讀書筆記初稿：以**我標的重點與我的備註**為主軸組織（不是重寫論文摘要），"
+            "用 ## 小標分段。每個論點後面附上素材裡對應的引用標記（原樣照抄 [[paper:…#p…@…]]）。"
+            "只能用上面的素材，不要捏造。標註少於 3 則時，只寫一小段說明素材不夠、建議再多標幾處。"
+            + ("\n最後一行註明：素材太多，後面幾頁的標註沒有納入。" if cut else "")},
+    ]
+
+
 # ---------------- Workspace wiki（規格見 docs/wiki.md）----------------
 WIKI_RULES = (
     f"你在維護一個研究主題的 wiki，用{LANG}寫 Markdown，專有名詞保留英文原文。"

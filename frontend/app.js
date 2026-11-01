@@ -6,7 +6,7 @@
  *   每頁旁邊另有一個 .twin（並排翻譯用的譯文頁），平常隱藏。
  *
  * 互動（仿 Moonlight）：選字 → 浮動工具列（解釋 / 螢光筆 / 翻譯 / 註解 / Ask AI）→ 浮動 AI 卡片；
- * 右側面板四個分頁：讀懂（摘要、解釋紀錄、聊天）｜我的筆記｜文獻｜Wiki。
+ * 右側面板五個分頁：讀懂（摘要、解釋紀錄、聊天）｜標註｜筆記｜文獻｜Wiki。
  * PDF 區的捲軸換成「頁面導軌」（#rail），縮放與頁碼是右下角的浮動小控制。
  */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -23,6 +23,7 @@ const tint = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 
 const store = {  // localStorage 可能被封鎖（無痕視窗等），讀寫失敗就用預設值
   get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* 忽略 */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* 忽略 */ } },
 };
 let customColor = store.get("lantern.customColor", "#7f9ea0");
 const AUTO = { "auto:novelty": "新穎", "auto:method": "方法", "auto:result": "結果" };
@@ -275,6 +276,7 @@ async function openPaper(id) {
   $("#backName").textContent = S.fromWs?.name || "全部論文";
   $("#btnHome").setAttribute("aria-label", `回到${S.fromWs ? `研究主題「${S.fromWs.name}」` : "全部論文"}`);
   loadSideList().catch(() => {});
+  loadNote(id);
   S.annotations = await api(`/api/papers/${id}/annotations`);
   S.tr = {}; S.trQueue = []; S.figures = []; S.refs = [];
   api(`/api/papers/${id}/figures`).then((f) => { S.figures = f; }).catch(() => {});
@@ -831,6 +833,7 @@ async function selAction(act, question = "") {
     return alignHighlight(await addAnnotation({ page, rects, color: S.hlColor, text }));
   }
   if (act === "comment") return commentEditor(sel);
+  if (act === "quote") { getSelection().removeAllRanges(); return quoteToNote(text, page); }
   if (act === "translate") {
     return aiCard({ title: "翻譯", anchor: box, quote, url: `${base}/translate`, body: { text, page } });
   }
@@ -843,7 +846,7 @@ async function selAction(act, question = "") {
   });
 }
 
-// 快捷鍵：選字後按 E 解釋、H 螢光筆、T 翻譯、C 註解；Esc 關閉浮動元件
+// 快捷鍵：選字後按 E 解釋、H 螢光筆、T 翻譯、C 註解、Q 引用到筆記；Esc 關閉浮動元件
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     setCropping(false); clearCrop(); closeAiCard(); setLibDrawer(false);
@@ -851,7 +854,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (selBar.hidden || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
-  const act = { e: "explain", h: "highlight", t: "translate", c: "comment" }[e.key.toLowerCase()];
+  const act = { e: "explain", h: "highlight", t: "translate", c: "comment", q: "quote" }[e.key.toLowerCase()];
   if (act) { e.preventDefault(); selAction(act); }
 });
 
@@ -865,7 +868,7 @@ $("#pages").addEventListener("contextmenu", (e) => {
   const m = $("#ctxMenu");
   m.hidden = false;
   m.style.left = `${Math.min(innerWidth - 180, e.clientX)}px`;
-  m.style.top = `${Math.min(innerHeight - 190, e.clientY)}px`;
+  m.style.top = `${Math.min(innerHeight - 230, e.clientY)}px`;
 });
 $("#ctxMenu").addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
@@ -1577,9 +1580,11 @@ function noteItem(a, inner) {
   li.className = a.kind === "user" ? colorKey(a.color) : a.kind.replace("auto:", "auto ");
   if (a.kind === "user" && isHex(a.color)) li.style.borderLeftColor = a.color;
   li.innerHTML = `<div class="meta"><span>p.${a.page + 1}</span><span>${fmtDate(a.created)}</span>
+      <button class="link small quote" data-k="quote" title="把這則引用到「筆記」分頁">引用</button>
       <button class="link small del" data-k="del">刪除</button></div>${inner}`;
   li.addEventListener("click", (e) => {
     if (e.target.dataset.k === "del") return deleteAnnotation(a);
+    if (e.target.dataset.k === "quote") return quoteToNote(a.text, a.page, a);
     if (!/TEXTAREA|SUMMARY|A/.test(e.target.tagName)) goToPage(a.page, a.id);
   });
   return li;
@@ -1654,6 +1659,214 @@ function renderRefs() {
   }
 }
 $("#refSearch").oninput = renderRefs;
+
+/* ---------------- 筆記分頁（docs/notes-design.md）----------------
+ * 每篇一份 Markdown，原生 textarea（中文輸入法最穩）＋ renderWiki 預覽。
+ * 自動儲存：停手 1 秒、失焦、切走分頁時存；組字中不存。PUT 帶 base_updated，別的分頁先存過會回 409，不覆蓋。
+ * 還沒存進伺服器的內容隨時備份在 localStorage（lantern.note.<pid>），存成功才清掉。 */
+const nbText = $("#nbText");
+const NB = { pid: null, updated: null, saved: "", timer: 0, busy: false, again: false, conflict: null, composing: false };
+const nbKey = (pid) => `lantern.note.${pid}`;
+const nbStatus = (t, cls = "") => { $("#nbStatus").textContent = t; $("#nbStatus").className = `nbstatus small ${cls || "muted"}`; };
+
+/** 筆記頂端的提示列（衝突、還原草稿）：文字 + 幾個動作按鈕；不給 actions 就收起來。 */
+function nbMsg(text, actions = []) {
+  const m = $("#nbMsg");
+  m.hidden = !text;
+  m.innerHTML = text ? `<span>${escapeHTML(text)}</span>` : "";
+  for (const [label, fn] of actions) {
+    const b = document.createElement("button");
+    b.className = "small";
+    b.textContent = label;
+    b.onclick = () => { nbMsg(""); fn(); };
+    m.append(b);
+  }
+}
+
+async function loadNote(pid) {
+  if (NB.pid && NB.pid !== pid) saveNote();  // 換篇前把上一篇沒存的送出去（saveNote 先記下 pid 與內容）
+  clearTimeout(NB.timer);
+  Object.assign(NB, { pid, updated: null, saved: "", conflict: null });
+  nbText.value = "";
+  nbText.readOnly = true;  // 讀到伺服器那份之前不能打字，免得被蓋掉
+  nbMsg(""); nbStatus("");
+  $("#nbDraftBox").hidden = true;
+  const cardNote = S.paper?.note;
+  $("#nbCardNote").hidden = !cardNote;
+  $("#nbCardNote").textContent = cardNote ? `論文卡備註：${cardNote}` : "";
+  let n;
+  try {
+    n = await api(`/api/papers/${pid}/note`);
+  } catch (e) {
+    if (NB.pid === pid) nbStatus(`讀不到筆記：${e.message}`, "err");
+    return;
+  }
+  if (NB.pid !== pid) return;
+  Object.assign(NB, { updated: n.updated, saved: n.markdown });
+  nbText.value = n.markdown;
+  nbText.readOnly = false;
+  if ($("#nbMode .on").dataset.m === "preview") renderWiki($("#nbPreview"), n.markdown);
+  if (n.updated) nbStatus(`上次儲存 ${fmtDate(n.updated)}`);
+  const local = store.get(nbKey(pid), null);
+  if (local == null || local === n.markdown) return store.del(nbKey(pid));
+  nbMsg("這台電腦上有一份還沒存進伺服器的筆記內容（可能上次存檔失敗或分頁被關掉）。", [
+    ["還原那份", () => { nbText.value = local; noteChanged(); }],
+    ["不用了", () => store.del(nbKey(pid))],
+  ]);
+}
+
+/** 內容變了：先備份到 localStorage，停手 1 秒後存。組字中（注音、倉頡選字）什麼都不做，等 compositionend。 */
+function noteChanged() {
+  if (NB.composing || !NB.pid) return;
+  store.set(nbKey(NB.pid), nbText.value);
+  clearTimeout(NB.timer);
+  NB.timer = setTimeout(saveNote, 1000);
+  if (!NB.conflict) nbStatus("尚未儲存…");
+}
+nbText.addEventListener("input", (e) => { if (!e.isComposing) noteChanged(); });
+nbText.addEventListener("compositionstart", () => { NB.composing = true; clearTimeout(NB.timer); });
+nbText.addEventListener("compositionend", () => { NB.composing = false; noteChanged(); });
+nbText.addEventListener("blur", () => { if (!NB.composing) saveNote(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNote(); });
+
+async function saveNote() {
+  clearTimeout(NB.timer);
+  const pid = NB.pid, md = nbText.value;
+  if (!pid || nbText.readOnly || md === NB.saved || NB.conflict) return;
+  if (NB.busy) { NB.again = true; return; }  // 一次只送一個，不然第二個會拿舊的 updated 撞 409
+  NB.busy = true;
+  nbStatus("儲存中…");
+  try {
+    const r = await reach(`/api/papers/${pid}/note`, { method: "PUT", headers: { "Content-Type": "application/json" },
+                                                      body: JSON.stringify({ markdown: md, base_updated: NB.updated }) });
+    const out = await r.json().catch(() => ({}));
+    if (r.status === 401) showLogin(true);
+    if (NB.pid !== pid) {  // 送出後已換篇：只收尾備份
+      if (r.ok) store.del(nbKey(pid));
+    } else if (r.status === 409) {
+      noteConflict(out);
+    } else if (!r.ok) {
+      throw new Error(r.status === 422 ? "筆記太長（上限約一百萬字）" : out.detail || r.statusText);
+    } else {
+      Object.assign(NB, { updated: out.updated, saved: md });
+      if (nbText.value === md) store.del(nbKey(pid));
+      nbStatus(`已儲存 ${new Date(out.updated * 1000).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}`);
+    }
+  } catch (e) {
+    if (NB.pid === pid) nbStatus(`沒存進去（${e.message}）。內容已留在這台電腦上，繼續編輯或離開欄位時會再試。`, "err");
+  } finally {
+    NB.busy = false;
+    if (NB.again) { NB.again = false; saveNote(); }
+  }
+}
+
+/** 409：伺服器上的版本比這裡新（另一個分頁或裝置改過）。不自動覆蓋任何一邊，讓使用者選。 */
+function noteConflict(server) {
+  NB.conflict = server;
+  nbStatus("暫停自動儲存：有另一份比較新的版本", "warn");
+  nbMsg("另一個分頁（或裝置）改過這份筆記。你這邊的內容還在編輯框裡，沒有被蓋掉。", [
+    ["用我這份", () => { NB.updated = server.updated; NB.conflict = null; saveNote(); }],
+    ["改用另一份（我這份先複製）", async () => {
+      await navigator.clipboard.writeText(nbText.value).then(() => toast("<span>你原本那份已複製到剪貼簿</span>"),
+        () => toast('<span class="err">複製失敗；你原本那份仍備份在這台電腦上</span>'));
+      Object.assign(NB, { updated: server.updated, saved: server.markdown, conflict: null });
+      nbText.value = server.markdown;
+      if ($("#nbMode .on").dataset.m === "preview") renderWiki($("#nbPreview"), server.markdown);
+      nbStatus(`已載入較新的版本 ${fmtDate(server.updated)}`);
+    }],
+  ]);
+}
+
+function setNbMode(m) {
+  $$("#nbMode button").forEach((b) => { b.classList.toggle("on", b.dataset.m === m); b.setAttribute("aria-pressed", b.dataset.m === m); });
+  nbText.hidden = m === "preview";
+  $("#nbPreview").hidden = m !== "preview";
+  if (m === "preview") {
+    renderWiki($("#nbPreview"), nbText.value || "*（還沒寫任何東西）*");
+    saveNote();
+  }
+}
+$("#nbMode").onclick = (e) => { const b = e.target.closest("button[data-m]"); if (b) setNbMode(b.dataset.m); };
+
+// 預覽裡的引用：同一篇直接跳頁並閃標註；別篇先開那篇
+$("#nbPreview").onclick = (e) => {
+  if (e.target.closest("a.wref")) return e.preventDefault();  // [[slug]] 是 Wiki 頁，閱讀頁裡沒有對應，只顯示
+  const c = e.target.closest(".wcite");
+  if (c) openAt(c.dataset.pid, +c.dataset.page, c.dataset.aid)
+    .catch((err) => toast(`<span class="err">開不了這篇論文：${escapeHTML(err.message)}（可能已經被刪除）</span>`));
+};
+
+/** 在游標處插入一段 Markdown（前後補空行），切到編輯並觸發自動儲存。 */
+function insertIntoNote(md) {
+  if (nbText.readOnly) return toast("<span>筆記還在載入，稍等一下再試</span>");
+  openPanel("notebook");
+  setNbMode("edit");
+  const s = nbText.selectionStart, pre = nbText.value.slice(0, s);
+  const lead = !pre || pre.endsWith("\n\n") ? "" : pre.endsWith("\n") ? "\n" : "\n\n";
+  nbText.focus();
+  nbText.setRangeText(`${lead}${md.trim()}\n\n`, s, nbText.selectionEnd, "end");
+  noteChanged();
+}
+
+/** 引用到筆記：原文做成引用區塊 + 回連標記；從標註來的帶 @aid（點了會閃那則標註），選字來的只到頁。 */
+function quoteToNote(text, page, a = null) {
+  if (!S.paper) return;
+  const link = `[[paper:${S.paper.id}#p${page + 1}${a ? `@${a.id}` : ""}]]`;
+  let md = `> ${String(text).replace(/\s+/g, " ").trim()}\n> ${link}`;
+  if (a && a.kind !== "explain" && a.comment?.trim()) md += `\n\n${a.comment.trim()}`;  // 使用者的備註接在下面
+  insertIntoNote(md);
+}
+
+// AI 擬初稿：串到草稿框，按「插入」才放進筆記（不邊串邊改 textarea，免得打亂游標與組字）
+$("#nbDraft").onclick = async () => {
+  if (!S.paper) return;
+  const btn = $("#nbDraft"), out = $("#nbDraftOut"), pid = S.paper.id;
+  $("#nbDraftBox").hidden = false;
+  $("#nbInsert").disabled = true;
+  btn.disabled = true;
+  out.innerHTML = "";
+  const stop = pushLater((w) => out.append(w), 32, "擬稿中…");
+  try {
+    NB.draft = await stream(`/api/papers/${pid}/note/draft`, {}, (t) => { stop(); renderWiki(out, t); });
+    if (S.paper?.id === pid) { renderWiki(out, NB.draft); $("#nbInsert").disabled = !NB.draft; }
+  } catch (e) {
+    out.innerHTML = `<span class="err">擬稿失敗：${escapeHTML(e.message)}</span>`;
+  } finally {
+    stop();
+    btn.disabled = false;
+  }
+};
+$("#nbInsert").onclick = () => { insertIntoNote(NB.draft || ""); $("#nbDraftBox").hidden = true; };
+$("#nbDraftClose").onclick = () => { $("#nbDraftBox").hidden = true; };
+
+/** 匯出 .md（Obsidian 友善）：YAML frontmatter + 引用標記換成可點回 Lantern 的網址 #<pid>/p<n>/<aid>。 */
+$("#nbExport").onclick = async () => {
+  if (!S.paper) return;
+  const p = S.paper, base = location.origin + location.pathname;
+  const bib = await api(`/api/papers/${p.id}/cite`).then((r) => r.bib || {}, () => ({}));  // 書目拿不到就略過作者年份
+  const body = nbText.value.replace(/\[\[paper:([^#\s\]]+)#p(\d+)(?:@(\w+))?(?:\|[^\]]*)?\]\]/g,
+    (_, pid, n, aid) => `[p.${n}](${base}#${pid}/p${n}${aid ? `/${aid}` : ""})`);
+  const q = (s) => JSON.stringify(String(s));  // JSON 字串也是合法的 YAML 雙引號字串
+  const authors = (bib.authors || []).map((a) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean);
+  const fm = [`title: ${q(p.title || p.filename)}`,
+    authors.length ? `authors:\n${authors.map((a) => `  - ${q(a)}`).join("\n")}` : "",
+    bib.year ? `year: ${q(bib.year)}` : "", bib.doi ? `doi: ${q(bib.doi)}` : "",
+    `source: ${q(`${base}#${p.id}`)}`, `exported: ${q(new Date().toISOString().slice(0, 10))}`].filter(Boolean).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([`---\n${fm}\n---\n\n${body}\n`], { type: "text/markdown;charset=utf-8" }));
+  a.download = `${(p.title || p.filename).replace(/[\\/:*?"<>|]+/g, " ").slice(0, 80).trim() || "note"}.md`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// 列印／存成 PDF：只印渲染好的筆記（style.css 的 body.printnote）
+$("#nbPrint").onclick = () => {
+  const area = $("#nbPrintArea");
+  renderWiki(area, `# ${S.paper?.title || ""}\n\n${nbText.value}`);
+  document.body.classList.add("printnote");
+  addEventListener("afterprint", () => document.body.classList.remove("printnote"), { once: true });
+  print();
+};
 
 /* ---------------- 摘要 ---------------- */
 async function runSummary(refresh) {
@@ -1867,9 +2080,22 @@ async function showLogin(expired = false) {
 
 async function enter(user) {
   $("#userName").textContent = user.name;
-  const id = location.hash.slice(1);
-  if (id) openPaper(id).catch(showHome); else showHome();
+  const [id, p, aid] = location.hash.slice(1).split("/");
+  if (id) openAt(id, +(p || "").slice(1), aid).catch(showHome); else showHome();
 }
+
+/** 深連結 #<pid>/p<n>/<aid>（匯出的筆記用）：開論文、跳到第 n 頁（從 1 起）、閃一下那則標註。只有 #<pid> 就只開論文。 */
+async function openAt(pid, page, aid) {
+  if (S.paper?.id !== pid || document.body.dataset.view !== "reader") {
+    await openPaper(pid);
+    if (page) await new Promise((r) => setTimeout(r, 300));  // 同 openCite：等頁面排好再跳
+  }
+  if (page) goToPage(page - 1, /^\w+$/.test(aid || "") ? aid : undefined);  // aid 會進 CSS 選擇器，只收英數
+}
+addEventListener("hashchange", () => {
+  const [id, p, aid] = location.hash.slice(1).split("/");
+  if (id && document.body.dataset.view && document.body.dataset.view !== "login") openAt(id, +(p || "").slice(1), aid).catch(() => {});
+});
 
 const tile = (id, name, n, cls = "") => `<button class="card ${cls}" data-id="${escapeHTML(id)}">
   <span class="cname">${escapeHTML(name)}</span><span class="ccount">${n} 篇論文</span></button>`;
@@ -2065,11 +2291,11 @@ function renderWiki(el, md) {
   const out = [];
   const text = md.replace(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g, (_, target, label) => {
     target = target.trim();
-    const c = /^paper:([^#\s]+)#p(\d+)$/.exec(target);
+    const c = /^paper:([^#\s]+)#p(\d+)(?:@(\w+))?$/.exec(target);  // @aid：筆記裡的標註錨點
     if (c) {
-      const p = wsPaperList.find((x) => x.id === c[1]);
+      const p = wsPaperList.find((x) => x.id === c[1]) || library.find((x) => x.id === c[1]) || (S.paper?.id === c[1] && S.paper);
       const full = p ? p.title || p.filename : "論文";
-      out.push(`<button class="wcite" data-pid="${escapeHTML(c[1])}" data-page="${c[2]}" title="${escapeHTML(full)}，第 ${c[2]} 頁"
+      out.push(`<button class="wcite" data-pid="${escapeHTML(c[1])}" data-page="${c[2]}"${c[3] ? ` data-aid="${c[3]}"` : ""} title="${escapeHTML(full)}，第 ${c[2]} 頁"
         aria-label="開啟《${escapeHTML(full)}》第 ${c[2]} 頁">${escapeHTML(shortTitle(full))}<span class="wcp">p.${c[2]}</span></button>`);
     } else {
       out.push(`<a class="wref" href="#" data-slug="${escapeHTML(target)}">${escapeHTML(label?.trim() || target)}</a>`);

@@ -8,6 +8,7 @@
 - messages    ：每篇論文的聊天紀錄
 - users / workspaces / workspace_papers：使用者、各自的 workspace、論文 ↔ workspace（多對多）
 - wiki_pages / wiki_ingested / wiki_messages：workspace 的 LLM wiki 頁面、已整理過的論文、wiki 問答紀錄（規格見 docs/wiki.md）
+- notes       ：使用者自己寫的論文筆記，每人每篇一份（規格見 docs/notes-design.md）
 """
 from __future__ import annotations
 
@@ -56,6 +57,10 @@ CREATE TABLE IF NOT EXISTS wiki_ingested (
 CREATE TABLE IF NOT EXISTS wiki_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT, role TEXT, content TEXT, created REAL
 );
+CREATE TABLE IF NOT EXISTS notes (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, paper_id TEXT NOT NULL, markdown TEXT DEFAULT '', created REAL, updated REAL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS notes_paper ON notes(user_id, paper_id);
 """
 
 
@@ -221,11 +226,40 @@ def search_chunks(uid: str, q: str, limit: int = 40) -> list[dict]:
 
 def delete_paper(pid: str) -> None:
     with conn() as c:
-        for t in ("papers", "chunks", "cache", "annotations", "messages"):
+        for t in ("papers", "chunks", "cache", "annotations", "messages", "notes"):
             col = "id" if t == "papers" else "paper_id"
             c.execute(f"DELETE FROM {t} WHERE {col}=?", (pid,))
         c.execute("DELETE FROM workspace_papers WHERE paper_id=?", (pid,))
         c.execute("DELETE FROM wiki_ingested WHERE paper_id=?", (pid,))  # shortcut: 頁面保留，內容可能提到已刪的論文
+
+
+# ---------- 論文筆記（docs/notes-design.md）----------
+def get_note(uid: str, pid: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT markdown, updated FROM notes WHERE user_id=? AND paper_id=?", (uid, pid)).fetchone()
+    return dict(r) if r else None
+
+
+def save_note(uid: str, pid: str, markdown: str, base_updated: float | None) -> tuple[bool, dict]:
+    """樂觀並行：base_updated 要等於資料庫裡的 updated（還沒有筆記 = None）才寫入。
+    回傳 (成功?, 成功時新的 {updated}、衝突時伺服器那份 {markdown, updated})。"""
+    now = time.time()
+    with conn() as c:
+        if base_updated is None:
+            try:
+                c.execute("INSERT INTO notes (id, user_id, paper_id, markdown, created, updated) VALUES (?,?,?,?,?,?)",
+                          (uuid.uuid4().hex, uid, pid, markdown, now, now))
+                return True, {"updated": now}
+            except sqlite3.IntegrityError:  # 別的分頁已經先建了
+                pass
+        else:
+            # 條件式 UPDATE：比對和寫入在同一句，兩個請求同時到也只有一個成功
+            now = max(now, base_updated + 1e-3)
+            if c.execute("UPDATE notes SET markdown=?, updated=? WHERE user_id=? AND paper_id=? AND updated=?",
+                         (markdown, now, uid, pid, base_updated)).rowcount:
+                return True, {"updated": now}
+        r = c.execute("SELECT markdown, updated FROM notes WHERE user_id=? AND paper_id=?", (uid, pid)).fetchone()
+    return False, dict(r) if r else {"markdown": "", "updated": None}
 
 
 # ---------- workspaces ----------
