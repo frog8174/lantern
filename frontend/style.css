@@ -32,6 +32,7 @@
   --result: #4F6479;  --result-bg: rgba(79, 100, 121, .16);
   /* 陰影：紙張疊放的薄影 */
   --shadow-page: 0 1px 2px rgba(35, 33, 30, .07), 0 8px 22px rgba(35, 33, 30, .08);
+  --page-sh1: rgba(35, 33, 30, .07); --page-sh2: rgba(35, 33, 30, .08);  /* 論文頁的陰影色（偏移量跟著縮放，見 .page） */
   --shadow-float: 0 2px 6px rgba(35, 33, 30, .10), 0 16px 40px rgba(35, 33, 30, .16);
   /* 圓角依材質：紙 2px、控制項 6px、卡片 8px、對話框 10px */
   --radius-sheet: 2px; --radius-sm: 6px; --radius: 8px; --radius-dlg: 10px;
@@ -58,7 +59,7 @@
     --rule: #3A3732; --rule-strong: #4A463F;
     --lamp: #E8B85C; --lamp-fill: rgba(232, 184, 92, .38);
     --seal: #D9836E; --primary-ink: #1C1B19; --tint: #33302B; --warn: #D2B27A;
-    --shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
+    --shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35); --page-sh1: rgba(0, 0, 0, .4); --page-sh2: rgba(0, 0, 0, .35);
     --shadow-float: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
     --backdrop: rgba(0, 0, 0, .55);
   }
@@ -69,7 +70,7 @@
   --rule: #3A3732; --rule-strong: #4A463F;
   --lamp: #E8B85C; --lamp-fill: rgba(232, 184, 92, .38);
   --seal: #D9836E; --primary-ink: #1C1B19; --tint: #33302B; --warn: #D2B27A;
-  --shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
+  --shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35); --page-sh1: rgba(0, 0, 0, .4); --page-sh2: rgba(0, 0, 0, .35);
   --shadow-float: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
   --backdrop: rgba(0, 0, 0, .55);
 }
@@ -254,7 +255,9 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 /* 畫面外的頁跳過排版與繪製：拖曳右欄、縮放視窗時只重排看得到的頁（數千個文字層 span）。
    高度由 JS 設 contain-intrinsic-height＝頁高，捲動位置與跳頁不受影響 */
 .prow { display: flex; gap: calc(18px * var(--zs, 1)); content-visibility: auto; }
-.page, .twin { position: relative; background: white; box-shadow: var(--shadow-page); flex: none; }
+/* 陰影的偏移、模糊也跟著倍率（--zs），縮放預覽和定案後才不會一深一淺 */
+.page, .twin { position: relative; background: white; flex: none;
+  box-shadow: 0 calc(1px * var(--zs, 1)) calc(2px * var(--zs, 1)) var(--page-sh1), 0 calc(8px * var(--zs, 1)) calc(22px * var(--zs, 1)) var(--page-sh2); }
 .twin { display: none; }
 #pages.tr-side .twin { display: block; }
 .page canvas, .twin canvas { display: block; }
@@ -306,7 +309,7 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .cmark:hover { background: var(--leaf); }
 .cmark.left { left: 1.2%; } .cmark.right { right: 1.2%; }
 .cmark svg { width: 14px; height: 14px; }
-.page .pno, .twin .pno { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-2);
+.page .pno, .twin .pno { position: absolute; bottom: min(-17px, calc(-22px * var(--zs, 1))); left: 0; right: 0; text-align: center; font-size: max(11px, calc(14px * var(--zs, 1))); color: var(--ink-2);
   font-variant-numeric: tabular-nums; }
 /* 框選模式：十字游標＋頁面外一圈燈光虛線，一眼看得出已啟用；並排時譯文頁也能框（取同位置的原文頁圖） */
 .viewer.panning, .viewer.panning * { cursor: grabbing !important; user-select: none; }
