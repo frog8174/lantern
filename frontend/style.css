@@ -490,17 +490,23 @@ input[type="checkbox"] { accent-color: var(--ink); }
   main.nbwide .nbfeed { padding: 20px 24px 40px; }
   main.nbwide .nbfeed > :not(.nbbody), main.nbwide .nbbody { width: 100%; max-width: 760px; margin-inline: auto; }
   main.nbwide .nbbody { display: block; }
-  /* 浮動大綱：sticky + 右浮動 + 負左邊界＝跟著捲動停在紙的右上角，但不推開內文；平常淡，滑過才清楚 */
-  main.nbwide .nboutline { display: block; position: sticky; top: 10px; z-index: 3; float: right; width: 176px; margin: 10px 10px 0 -186px;
-    max-height: 60vh; overflow-y: auto; padding: 6px 4px; border-radius: var(--radius); border: 1px solid rgba(35, 33, 30, .08);
-    background: rgba(255, 255, 255, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    opacity: .45; transition: opacity .2s; color: #5E594F; }
-  main.nbwide .nboutline:is(:hover, :focus-within) { opacity: 1; background: rgba(255, 255, 255, .88); }
-  main.nbwide .nboutline p { padding: 0 6px; font-size: 12px; }
+  /* 點線大綱（像 HackMD）：平常只是紙面右緣一排短橫線，每條代表一個標題、長短表示層級；
+     指到才展開成半透明小卡顯示標題文字。sticky + 右浮動 + 負左邊界＝跟著捲動停在紙的右上角、不推開內文 */
+  main.nbwide .nboutline { display: block; position: sticky; top: 14px; z-index: 3; float: right; width: 30px; margin: 14px 8px 0 -38px;
+    max-height: 60vh; overflow: hidden; padding: 6px 0; border-radius: var(--radius); border: 1px solid transparent; }
+  main.nbwide .nboutline:empty { display: none; }
+  main.nbwide .nboutline:is(:hover, :focus-within) { width: 196px; margin-left: -204px; overflow-y: auto; padding: 6px 4px;
+    background: rgba(255, 255, 255, .9); border-color: rgba(35, 33, 30, .08); box-shadow: var(--shadow-page);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  main.nbwide .nboutline:not(:hover):not(:focus-within) button { font-size: 0; height: 9px; padding: 0; display: flex; align-items: center; justify-content: flex-end; }
+  main.nbwide .nboutline:not(:hover):not(:focus-within) button::after { content: ""; height: 2px; border-radius: 1px; background: rgba(35, 33, 30, .28); margin-right: 6px; }
+  main.nbwide .nboutline:not(:hover):not(:focus-within) .lv1::after { width: 18px; }
+  main.nbwide .nboutline:not(:hover):not(:focus-within) .lv2::after { width: 12px; }
+  main.nbwide .nboutline:not(:hover):not(:focus-within) .lv3::after { width: 7px; }
 
   main.nbwide .nbsheet { padding: 36px 44px 96px; min-height: 72vh; }
   main.nbwide #nbEditor .cm-editor, main.nbwide .nbtext { font-size: 16px; }
-  .nboutline ul { list-style: none; margin: 6px 0 0; padding: 0; }
+  .nboutline ul { list-style: none; margin: 0; padding: 0; }
   .nboutline button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 3px 6px; color: #5E594F;
     font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
   .nboutline button:hover { color: #23211E; background: rgba(35, 33, 30, .06); }

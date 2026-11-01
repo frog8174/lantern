@@ -1997,8 +1997,8 @@ function nbStats() {
   if (!mainEl.classList.contains("nbwide")) return;
   const hs = nbHeadings(md);
   $("#nbOutline").innerHTML = hs.length
-    ? `<b class="small muted">大綱</b><ul>${hs.map((h) => `<li><button class="lv${Math.min(h.level, 3)}" data-pos="${h.pos}">${escapeHTML(h.text)}</button></li>`).join("")}</ul>`
-    : '<p class="small muted">用 # 開頭寫標題，這裡會列出大綱。</p>';
+    ? `<ul aria-label="筆記大綱">${hs.map((h) => `<li><button class="lv${Math.min(h.level, 3)}" data-pos="${h.pos}">${escapeHTML(h.text)}</button></li>`).join("")}</ul>`
+    : "";  // 沒有標題就不顯示（點線大綱只在有標題時出現）
 }
 const nbStatsLater = () => { clearTimeout(NB.statTimer); NB.statTimer = setTimeout(nbStats, 250); };
 $("#nbOutline").onclick = (e) => {
