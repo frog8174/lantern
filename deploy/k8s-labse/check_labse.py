@@ -33,7 +33,7 @@ norm = lambda m: m / np.linalg.norm(m, axis=1, keepdims=True)
 same = (norm(remote) * norm(local)).sum(1)
 print("同一句 vLLM 與官方的餘弦（應 > 0.99）：", np.round(same, 4))
 sim = norm(remote) @ norm(remote).T
-print("對照句相似度（英↔中，應明顯高於錯配）：")
+print("對照句相似度（英-中，應明顯高於錯配）：")
 for i in range(len(PAIRS)):
     print(f"  第 {i + 1} 對：對的 {sim[2 * i, 2 * i + 1]:.3f}，"
           f"錯配 {max(sim[2 * i, 2 * j + 1] for j in range(len(PAIRS)) if j != i):.3f}")
