@@ -6,7 +6,7 @@ LaBSE 是專為雙語對照句訓練的模型（Bertalign 的預設），比每�
 ## 部署（`deploy/k8s-labse/`）
 | 項目 | 設定 |
 |---|---|
-| 伺服器 | vLLM `vllm/vllm-openai:v0.10.2`，`--runner pooling --convert embed`，OpenAI 相容 `/v1/embeddings`，模型名 `labse` |
+| 伺服器 | vLLM `vllm/vllm-openai:v0.28.0`，`--runner pooling --convert embed`，OpenAI 相容 `/v1/embeddings`，模型名 `labse` |
 | GPU | 節點用 `nodeSelector`（`kubernetes.io/hostname`），**第一張卡**用 `NVIDIA_VISIBLE_DEVICES=0` 直接掛（不向 device plugin 要 `nvidia.com/gpu`），顯存只拿 10% |
 | 模型快取 | PVC `hf-cache` 10Gi（rook-ceph-hdd-block） |
 | 叢集內位址 | `http://labse.embedding.svc.cluster.local:8000/v1`（Lantern 正式環境用這個） |
@@ -34,3 +34,5 @@ LaBSE 是專為雙語對照句訓練的模型（Bertalign 的預設），比每�
 - **「指定第一張卡」的代價**：沒有向 k8s 要 `nvidia.com/gpu`，排程器不知道這張卡被用了，別的工作仍可能排到同一張卡。LaBSE 很小，共用沒問題；若要獨占，改成 `resources.limits: {nvidia.com/gpu: 1}`（但就不能指定是哪一張）。
 - **LaBSE 的 Dense 頭**：官方 LaBSE 是 CLS → Dense(tanh) → 正規化。不同版本的 vLLM 不一定會套 sentence-transformers 的 Dense 層；`check_labse.py` 不過時，備案是改用 HuggingFace Text Embeddings Inference（TEI）或換 vLLM 版本，Lantern 端不用改（同樣是 `/v1/embeddings`）。
 - Lantern 端設定（之後實作）：`ALIGN_EMBED_URL`、`ALIGN_EMBED_MODEL=labse`、`ALIGN_EMBED_API_KEY`（Secret）。端點連不到時退回本機規則，再不行才問 LLM。
+
+- **`--max-model-len` 最多 256**：LaBSE 的 `max_position_embeddings` 是 256，設 512 會在啟動時被 vLLM 拒絕。超過 256 token 的句子會被截斷；論文的單句很少這麼長。

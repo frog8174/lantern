@@ -15,7 +15,7 @@ spec:
     spec:
       # 指定 GPU 節點：改成有 GPU 的那台（kubectl get nodes）
       nodeSelector:
-        kubernetes.io/hostname: toolmen-server3       # TODO: 例如 toolmen-server2
+        kubernetes.io/hostname: toolmen-server3
       # 指定第一張卡：不向 device plugin 要 nvidia.com/gpu（那樣拿到哪張卡由排程決定），
       # 改用 NVIDIA container runtime 直接掛 GPU 0。代價：這張卡不會被 k8s 記成「已占用」，可能和別的工作共用；
       # LaBSE 很小（fp16 約 1 GB），所以下面把 vLLM 的顯存上限壓低。
@@ -25,13 +25,13 @@ spec:
         - name: vllm
           image: vllm/vllm-openai:v0.28.0       # 釘版本；換版前先在本機驗證（docs/labse.md）
           args:
-            - --model=sentence-transformers/LaBSE
+            - sentence-transformers/LaBSE      # vllm serve 的模型用位置參數（--model 將被移除）
             - --served-model-name=labse
             - --runner=pooling
             - --convert=embed
             - --dtype=float16
-            - --max-model-len=512               # LaBSE 上限 512 token；一句一筆，夠用
-            - --gpu-memory-utilization=0.03     # 和其他工作共用這張卡，只拿 10% 顯存
+            - --max-model-len=256               # LaBSE 的位置編碼上限是 256，設更大會啟動失敗
+            - --gpu-memory-utilization=0.03     # 和其他工作共用這張卡，只拿 3% 顯存
             - --port=8000
           env:
             - { name: NVIDIA_VISIBLE_DEVICES, value: "0" }   # 第一張卡
