@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 import re
 import sqlite3
 import time
@@ -268,9 +269,23 @@ _WS = ("SELECT w.id, w.name, w.created, COUNT(wp.paper_id) AS count FROM workspa
 
 
 def list_workspaces(uid: str) -> list[dict]:
+    """首頁卡片用：每個研究主題另附 recent（最新加入的 3 篇 id）、updated（最後加入時間）、tags（最常見 2 個標籤）。"""
     with conn() as c:
         rows = c.execute(_WS + "WHERE w.user_id=? GROUP BY w.id ORDER BY w.created DESC", (uid,)).fetchall()
-    return [dict(r) for r in rows]
+        members = c.execute("SELECT wp.workspace_id AS wid, p.id, p.tags, wp.added FROM workspace_papers wp "
+                            "JOIN workspaces w ON w.id = wp.workspace_id JOIN papers p ON p.id = wp.paper_id "
+                            "WHERE w.user_id=? ORDER BY wp.added DESC", (uid,)).fetchall()
+    out = [{**dict(r), "recent": [], "updated": None, "tags": []} for r in rows]
+    by, tagc = {w["id"]: w for w in out}, {}
+    for m in members:
+        w = by[m["wid"]]
+        if len(w["recent"]) < 3:
+            w["recent"].append(m["id"])
+        w["updated"] = w["updated"] or m["added"]
+        tagc.setdefault(m["wid"], Counter()).update(json.loads(m["tags"] or "[]"))
+    for wid, cnt in tagc.items():
+        by[wid]["tags"] = [t for t, _ in cnt.most_common(2)]
+    return out
 
 
 def get_workspace(uid: str, wid: str) -> dict | None:

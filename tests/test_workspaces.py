@@ -58,6 +58,8 @@ def test_workspace_crud(papers, client, bob):
     ws = {w["id"]: w for w in client.get("/api/workspaces").json()}
     assert list(ws)[:2] == [b["id"], a["id"]]  # 新到舊
     assert ws[a["id"]]["count"] == 2 and ws[b["id"]]["count"] == 1
+    assert ws[a["id"]]["recent"] == [p2, p1] and ws[b["id"]]["recent"] == [p1]  # 首頁卡片：新加入的在前
+    assert ws[a["id"]]["updated"] >= ws[b["id"]]["updated"]
     ids = lambda wid: [p["id"] for p in client.get("/api/papers", params={"workspace": wid}).json()]
     assert set(ids(a["id"])) == {p1, p2} and ids(b["id"]) == [p1]
     assert {p1, p2} <= {p["id"] for p in client.get("/api/papers").json()}

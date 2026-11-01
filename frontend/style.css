@@ -726,7 +726,23 @@ body[data-view="login"] #userBox { display: none; }
 .card .ccount { color: var(--ink-2); font-size: 14px; font-variant-numeric: tabular-nums; }
 /* 首頁方塊：正方形，名字放在下方 */
 .tiles .card { aspect-ratio: 1; justify-content: flex-end; }
-.tiles .card.all { background: var(--leaf); }
+.tiles .card { gap: 3px; overflow: hidden; }
+/* 上半部：最新 3 篇的首頁縮圖疊成一疊紙，最新的在最前；滑過時稍微攤開 */
+/* 紙堆佔掉文字以外的空間（在排版流裡，標籤多一行也不會壓到字） */
+.cstack { position: relative; flex: 1; min-height: 0; align-self: stretch; margin: 4px 0 10px; display: grid; place-items: center; pointer-events: none; }
+.cstack .sheet { position: absolute; top: 50%; left: 50%; translate: -50% -50%; height: min(100%, 132px); aspect-ratio: 8.5 / 11; object-fit: cover; object-position: top; background: #fff;
+  border-radius: 2px; box-shadow: 0 1px 2px var(--page-sh1), 0 6px 14px var(--page-sh2); transition: transform .25s ease; }
+.cstack .s0 { transform: rotate(-1.5deg); }
+.cstack .s1 { transform: translateX(22%) rotate(5deg); filter: brightness(.96); }
+.cstack .s2 { transform: translateX(-22%) rotate(-7deg); filter: brightness(.92); }
+.tiles .card:hover .s0, .tiles .card:focus-visible .s0 { transform: translateY(-4%) rotate(-1deg); }
+.tiles .card:hover .s1, .tiles .card:focus-visible .s1 { transform: translateX(30%) rotate(8deg); }
+.tiles .card:hover .s2, .tiles .card:focus-visible .s2 { transform: translateX(-30%) rotate(-10deg); }
+.cstack .sis { opacity: .35; }
+.card .ctags { color: var(--ink-3); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 「全部論文」是入口不是主題：左上角一盞小燈，紙堆後面一圈暖光 */
+.tiles .card.all { background: radial-gradient(60% 45% at 50% 36%, var(--lamp-fill), transparent 70%), var(--leaf); }
+.tiles .card.all .clamp { position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; color: var(--ink-2); }
 .tiles .card.new { justify-content: center; align-items: center; text-align: center; background: none; box-shadow: none; color: var(--ink-2);
   border: 1px dashed var(--rule-strong); }
 .tiles .card.new .plus { font-size: 34px; line-height: 1; color: var(--ink-2); }

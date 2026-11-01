@@ -2675,15 +2675,40 @@ addEventListener("hashchange", () => {
   if (id && document.body.dataset.view && document.body.dataset.view !== "login") openAt(id, +(p || "").slice(1), aid).catch(() => {});
 });
 
-const tile = (id, name, n, cls = "") => `<button class="card ${cls}" data-id="${escapeHTML(id)}">
-  <span class="cname">${escapeHTML(name)}</span><span class="ccount">${n} 篇論文</span></button>`;
+/** 「3 天前」「昨天」這類相對時間（首頁卡片）。 */
+const RTF = new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" });
+function ago(t) {
+  const s = Date.now() / 1000 - t;
+  for (const [u, n] of [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]])
+    if (s >= n) return RTF.format(-Math.floor(s / n), u);
+  return "剛剛";
+}
+/** 首頁方塊：上半部疊著最新 3 篇的首頁縮圖（像桌上一疊紙），下面是名稱、篇數與更新時間、常見標籤。
+ *  w = {id, name, count, recent, updated, tags}；沒有論文時疊紙的位置換成休息的薛西弗斯。 */
+function tile(w, cls = "") {
+  const sheets = w.recent.slice(0, 3).reverse().map((pid, i, a) =>
+    `<img class="sheet s${a.length - 1 - i}" src="/api/papers/${encodeURIComponent(pid)}/thumb.png" alt="" loading="lazy">`).join("");
+  const meta = w.count ? `${w.count} 篇${w.updated ? `，${ago(w.updated)}更新` : ""}` : "還沒有論文";
+  return `<button class="card ${cls}${w.count ? "" : " bare"}" data-id="${escapeHTML(w.id)}">
+  <span class="cstack" aria-hidden="true">${w.count ? sheets : sisyphus("rest", 96)}</span>
+  ${cls === "all" ? '<svg class="clamp" aria-hidden="true"><use href="#i-lantern"/></svg>' : ""}
+  <span class="cname">${escapeHTML(w.name)}</span><span class="ccount">${meta}</span>
+  ${w.tags.length ? `<span class="ctags">${w.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</span>` : ""}</button>`;
+}
+/** 「全部論文」的卡片資料：從已載入的論文庫算（後端只替研究主題算）。 */
+function allTile() {
+  const by = [...library].sort((a, b) => b.created - a.created), cnt = {};
+  library.forEach((p) => p.tags.forEach((t) => (cnt[t] = (cnt[t] || 0) + 1)));
+  return { id: "", name: "全部論文", count: library.length, recent: by.slice(0, 3).map((p) => p.id),
+           updated: by[0]?.created, tags: Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 2) };
+}
 
 async function showHome() {
   setView("home");
   history.replaceState(null, "", location.pathname);
   [workspaces] = await Promise.all([api("/api/workspaces"), loadLibrary()]);
-  $("#wsGrid").innerHTML = tile("", "全部論文", library.length, "all")
-    + workspaces.map((w) => tile(w.id, w.name, w.count)).join("")
+  $("#wsGrid").innerHTML = tile(allTile(), "all")
+    + workspaces.map((w) => tile(w)).join("")
     + '<button class="card new" data-new="1"><span class="plus">＋</span>新增研究主題</button>'
     + (workspaces.length ? "" : `<p class="cards-empty">${sisyphus("rest", 240, "wm")}<span>還沒有研究主題。按「＋ 新增研究主題」把論文依主題分類；論文本身都會留在「全部論文」。</span></p>`);
 }
