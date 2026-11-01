@@ -653,15 +653,21 @@ if (innerWidth < 700) $("main").classList.add("nopanel");
 const mainEl = $("main"), panelEl = $(".panel");
 const setPanelWidth = (w) => mainEl.style.setProperty("--panel-w", `${w}px`);
 setPanelWidth(+store.get("lantern.panelW", 380));
+// 展開書寫另有一個寬度（--nb-w），拖曳時改的是目前這個模式的寬度，各自記住
+const setNbWidth = (w) => mainEl.style.setProperty("--nb-w", `${w}px`);
+if (store.get("lantern.nbW", "")) setNbWidth(+store.get("lantern.nbW", ""));
 $("#panelGrip").addEventListener("mousedown", (e) => {
   e.preventDefault();
-  const grip = e.currentTarget;
+  const grip = e.currentTarget, wide = mainEl.classList.contains("nbwide");
   grip.classList.add("dragging");
   let w = panelEl.offsetWidth;
-  const move = (ev) => { w = Math.round(Math.min(innerWidth * 0.55, Math.max(280, innerWidth - ev.clientX))); setPanelWidth(w); };
+  const move = (ev) => {
+    w = Math.round(Math.min(innerWidth * (wide ? 0.8 : 0.55), Math.max(wide ? 420 : 280, innerWidth - ev.clientX)));
+    (wide ? setNbWidth : setPanelWidth)(w);
+  };
   const up = () => {
     grip.classList.remove("dragging");
-    store.set("lantern.panelW", w);
+    store.set(wide ? "lantern.nbW" : "lantern.panelW", w);
     removeEventListener("mousemove", move); removeEventListener("mouseup", up);
   };
   addEventListener("mousemove", move);

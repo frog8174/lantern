@@ -479,7 +479,7 @@ input[type="checkbox"] { accent-color: var(--ink); }
 #nbEditor .cm-completionDetail { color: var(--ink-2); font-style: normal; margin-left: .8em; }
 /* 展開書寫：筆記拿畫面不到一半，論文頁仍有足夠寬度；大綱是半透明的小卡，浮在紙面右上角，不佔版面 */
 @media (min-width: 700px) {
-  main.nbwide { --pw: min(46vw, 820px); }
+  main.nbwide { --pw: min(var(--nb-w, min(46vw, 820px)), 80vw); }  /* 可拖曳左緣調寬（--nb-w） */
   main.nbwide, main.nbwide.nopanel { grid-template-columns: minmax(0, 1fr) var(--pw); }
   main.nbwide .lib { display: none; }
   main.nbwide .nbhead { display: flex; align-items: flex-end; gap: 16px; padding: 16px 28px 10px; border-bottom: 1px solid var(--rule); }
