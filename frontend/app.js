@@ -2659,7 +2659,8 @@ $("#wsPapers").onclick = async (e) => {
   const del = e.target.closest(".cdel");
   if (!del) return openPaper(id);
   if (!armDelete(del)) return;
-  await api(curWs ? `/api/workspaces/${curWs.id}/papers/${id}` : `/api/papers/${id}`, { method: "DELETE" });
+  try { await api(curWs ? `/api/workspaces/${curWs.id}/papers/${id}` : `/api/papers/${id}`, { method: "DELETE" }); }
+  catch (err) { $("#wsStatus").textContent = `${curWs ? "移出" : "刪除"}失敗：${err.message}`; return; }
   showWs();
 };
 
