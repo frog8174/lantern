@@ -13,9 +13,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/config.py": {
-    "mtime": 1793507554.0570335,
-    "seen": 1793508122.3490672,
-    "ast_hash": "c9277da14045a195fd00246b2fae7b73",
+    "mtime": 1793512567.794875,
+    "seen": 1793512586.5831888,
+    "ast_hash": "af633a87f77047e65cbccbdf784cf56d",
     "semantic_hash": ""
   },
   "backend/db.py": {
@@ -37,16 +37,16 @@
     "semantic_hash": ""
   },
   "backend/main.py": {
-    "mtime": 1793506909.309314,
-    "seen": 1793507079.7784503,
-    "ast_hash": "32c9584d63e6272d3edbbec089638d18",
+    "mtime": 1793512567.794875,
+    "seen": 1793512586.5831888,
+    "ast_hash": "71453eb278388f2d7ded2d57703580ae",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
-    "mtime": 1792509013.4316416,
-    "seen": 1793463620.6364586,
-    "ast_hash": "c383622c30bace926a743bd72d8baf7a",
-    "semantic_hash": "c383622c30bace926a743bd72d8baf7a"
+    "mtime": 1793512567.795875,
+    "seen": 1793512586.5831888,
+    "ast_hash": "cf588daf0e2f38c936a766deb8d50dac",
+    "semantic_hash": ""
   },
   "backend/retrieval.py": {
     "mtime": 1792508391.4868758,
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793512146.022002,
-    "seen": 1793512165.5138657,
-    "ast_hash": "1414a9c432edbe3c801c3de562ee538e",
+    "mtime": 1793512567.7993872,
+    "seen": 1793512586.5831888,
+    "ast_hash": "78fa99db0457021bc38bf6c43f3021c7",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -73,9 +73,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "tests/conftest.py": {
-    "mtime": 1793457626.7003956,
-    "seen": 1793463620.6364586,
-    "ast_hash": "8cf4d830a4b1784974680ca8f407ff0f",
+    "mtime": 1793512567.7993872,
+    "seen": 1793512586.5831888,
+    "ast_hash": "03c1d28a063d03db17ee2f570f99fe34",
     "semantic_hash": ""
   },
   "tests/fake_api.py": {
@@ -265,9 +265,9 @@
     "semantic_hash": ""
   },
   "deploy/k8s/configmap.yaml": {
-    "mtime": 1793469672.2701602,
-    "seen": 1793504435.014687,
-    "ast_hash": "55ea851ebc004f687ba9de85c0434071",
+    "mtime": 1793512567.795875,
+    "seen": 1793512586.5831888,
+    "ast_hash": "d78ee1d9593ca755833a1ba495a13392",
     "semantic_hash": ""
   },
   "deploy/k8s/deployment.yaml": {
@@ -307,9 +307,9 @@
     "semantic_hash": ""
   },
   "docs/deploy.md": {
-    "mtime": 1793470127.3859105,
-    "seen": 1793504435.014687,
-    "ast_hash": "bcb69671fdf5249ee2d152ad0c5044d2",
+    "mtime": 1793512567.7973807,
+    "seen": 1793512586.5831888,
+    "ast_hash": "9f6af6726b1c1d0a15fc227cafa356f2",
     "semantic_hash": ""
   },
   "frontend/img/lantern/frame.png": {
@@ -349,9 +349,9 @@
     "semantic_hash": ""
   },
   "docs/reader.md": {
-    "mtime": 1793508120.321255,
-    "seen": 1793508122.3490672,
-    "ast_hash": "afddd5c3f8a04404503c6b56d301c99e",
+    "mtime": 1793512567.7983873,
+    "seen": 1793512586.5831888,
+    "ast_hash": "dc67f1ea840709aa34f1e6336c08b6a3",
     "semantic_hash": ""
   },
   "tests/test_notes.py": {
@@ -361,9 +361,9 @@
     "semantic_hash": ""
   },
   "deploy/k8s-labse/check_labse.py": {
-    "mtime": 1793509111.743018,
-    "seen": 1793512165.5138657,
-    "ast_hash": "9583047b2f81d7f6e2d31ff0e7377b55",
+    "mtime": 1793512350.1382256,
+    "seen": 1793512586.5831888,
+    "ast_hash": "0bca5e022a8451d26fefcd2ae17a1099",
     "semantic_hash": ""
   },
   "deploy/k8s-labse/deployment.yaml": {
@@ -403,9 +403,21 @@
     "semantic_hash": ""
   },
   "docs/labse.md": {
-    "mtime": 1793510230.6298702,
-    "seen": 1793512165.5138657,
-    "ast_hash": "d03f84f606f38ad65eb6212a12ce0cdc",
+    "mtime": 1793512567.7973807,
+    "seen": 1793512586.5831888,
+    "ast_hash": "6b0dc60c795fe1fd0fc08e7b75e1aa97",
+    "semantic_hash": ""
+  },
+  "backend/sentalign.py": {
+    "mtime": 1793512567.795875,
+    "seen": 1793512586.5831888,
+    "ast_hash": "b7f19534b4c03bd4021f147dae3b1fdf",
+    "semantic_hash": ""
+  },
+  "tests/test_sentalign.py": {
+    "mtime": 1793512567.8003874,
+    "seen": 1793512586.5831888,
+    "ast_hash": "15b007fe409f1cf6cd6d67f8e7993e6d",
     "semantic_hash": ""
   }
 }

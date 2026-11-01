@@ -1,6 +1,6 @@
 [project]
 name = "lantern-paper-reader"
-version = "0.1.0"
+version = "0.2.0"
 description = "個人用 AI 論文閱讀器（仿 Moonlight），接 vLLM 或任何 OpenAI 相容 API"
 readme = "README.md"
 requires-python = ">=3.11"
