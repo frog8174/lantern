@@ -55,3 +55,12 @@
 - `rest`：空狀態浮水印，靜態、單色 `--rule-strong`，放右下角，文字疊在上面。
 - `rest` 也用在：連不上伺服器的上方提示（64px）、用到一半登入失效（401）回到登入頁時取代推石。
 - 一律 `aria-hidden`，意思由旁邊的文字表達；`prefers-reduced-motion` 時全部靜止在第一格。
+
+## 登入頁與標誌
+- **版面**：大字 `Lantern`（Cormorant Garamond 500）壓在左下，沒有副標；登入按鈕在大字下方。馬燈（F2 船用護條款，`img/lantern/frame.png` + `light.png` 兩層遮罩）用細鏈從右上垂下，載入時輕晃一次就停。
+- **點燈**：指到或用鍵盤選到「以 Toolmen SSO 登入」時，大燈、按鈕裡的小燈、光暈與休息的薛西弗斯一起變亮。白天主題燈不點（玻璃是 `--rule-strong`），夜裡燈是 `--lamp`。
+- **薛西弗斯**：休息姿勢的浮水印，`img/sisyphus/rest_edge.png`（rest.png 裁到內容邊），貼齊右下角，山坡碰到頁面右緣與底緣；顏色 `--rule`，點燈時 `--rule-strong`。
+- **短句**：最下方置中、沒有底，霞鶩文楷；每 10 秒淡入換一句（`SAYINGS` in app.js），深夜／早上各有一句限時出現；減少動態時直接切換。卡繆不引用（部分地區仍有著作權）。
+- **頁尾**：`© 2026 Aaron` 與版本號（`/api/auth/config` 的 `version`，環境變數 `APP_VERSION`，預設 0.1.0）。
+- **按鈕**：直角、`--ink` 底，焦點框是 `--lamp` 外推 4px。
+- **標誌**：`img/logo.svg`（favicon，跟系統深淺色）與 index.html 的 `#i-lantern`（頂列品牌，燈體 currentColor、玻璃 `--lamp`），都是 F2 馬燈簡化成 32 格。

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Lantern 標誌：F2 船用馬燈簡化成 32 格。燈體跟著系統深淺色，燈火固定琥珀 -->
+  <style>.b{fill:#23211E}.s{fill:none;stroke:#23211E;stroke-width:2}@media (prefers-color-scheme:dark){.b{fill:#E6E0D4}.s{stroke:#E6E0D4}}</style>
+  <circle class="s" cx="16" cy="3.6" r="2.3"/>
+  <path class="b" d="M10.5 9.6h11l-1.6-3.1h-7.8z"/>
+  <rect class="b" x="9.5" y="9.4" width="13" height="2.2" rx=".6"/>
+  <path fill="#E8B85C" d="M11.4 12.6h9.2c.9 1.6 1.4 3.4 1.4 5.2s-.5 3.6-1.4 5.2h-9.2c-.9-1.6-1.4-3.4-1.4-5.2s.5-3.6 1.4-5.2z"/>
+  <path class="s" d="M10.6 12.2v11.2M21.4 12.2v11.2M16 12.2v2M16 21.4v2"/>
+  <path class="b" d="M16 14.6c1.6 1.6 2 3.2 0 5.6-2-2.4-1.6-4 0-5.6z"/>
+  <rect class="b" x="8.6" y="23.4" width="14.8" height="2.4" rx=".6"/>
+  <path class="b" d="M9.6 25.8h12.8l1.2 3.4H8.4z"/>
+</svg>

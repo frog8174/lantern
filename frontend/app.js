@@ -1625,27 +1625,61 @@ $("#chatClear").onclick = async (e) => {
 const setView = (v) => { document.body.dataset.view = v; };
 let workspaces = [], curWs = null;  // curWs = 目前的 workspace；null = 全部論文
 
-// expired：用到一半登入失效（401）→ 休息的薛西弗斯；平常 → 慢慢推石
+/* 登入頁的短句：每 10 秒淡入換一句；第三欄是只在這幾點出現（當地時間，可跨午夜） */
+const SAYINGS = [
+  ["燈亮著，就還能再讀一頁。"], ["夜很長，論文也是；燈先替你點好了。"], ["把一頁讀懂，比翻過十頁有用。"], ["字太小的地方，燈會幫你照近一點。"],
+  ["石頭又滾下來了，那就再推一次。"], ["今天也推到山頂一次就好。"], ["讀不完的論文，就是那顆石頭；但山頂的風景是真的。"],
+  ["Related work 不會自己寫，但我們可以先讀。"], ["先讀摘要，不丟臉。"], ["你下載的論文，總有一天會讀到。"], ["Reviewer 2 不在這裡，放心讀。"],
+  ["鍥而不舍，金石可鏤。", "《荀子》"], ["業精於勤，荒於嬉。", "韓愈"], ["學而不思則罔，思而不學則殆。", "《論語》"],
+  ["讀累了就休息，論文不會跑掉。"], ["卡住的地方先標起來，明天再看會比較清楚。"], ["今天讀得少也沒關係，有讀就好。"],
+  ["慢慢來，理解比速度重要。"], ["你不是一個人在讀，燈陪著你。"],
+  ["喝口水吧，論文不會因為你脫水而變短。"], ["眼睛說它想看看遠方，不是下一篇 PDF。"], ["椅子也累了，起來走兩步再回來。"],
+  ["咖啡是燃料，不是正餐。"], ["讀不懂不一定是你的問題，有些作者自己也沒想清楚。"], ["第三杯咖啡了？燈都替你擔心。"],
+  ["已經很晚了，這一頁讀完就去睡吧；Reviewer 2 也睡了。", "", [23, 5]],
+  ["早安，先從一篇摘要開始吧；咖啡可以邊讀邊喝。", "", [5, 10]],
+];
+let sayTimer = 0, sayLast = "";
+function nextSaying() {
+  if (document.body.dataset.view !== "login") { clearInterval(sayTimer); sayTimer = 0; return; }
+  const h = new Date().getHours();
+  const pool = SAYINGS.filter(([t, , w]) => t !== sayLast && (!w || (w[0] < w[1] ? h >= w[0] && h < w[1] : h >= w[0] || h < w[1])));
+  const [text, who] = pool[Math.floor(Math.random() * pool.length)];
+  sayLast = text;
+  const el = $("#loginSay");
+  const set = () => {
+    el.textContent = text;
+    if (who) el.insertAdjacentHTML("beforeend", `<small>${escapeHTML(who)}</small>`);
+    el.classList.remove("fade");
+  };
+  if (!el.textContent || matchMedia("(prefers-reduced-motion: reduce)").matches) return set();
+  el.classList.add("fade");
+  setTimeout(set, 900);
+}
+
+const LAMP = '<span class="llamp" aria-hidden="true"><i class="f"></i><i class="l"></i></span>';
+// expired：用到一半登入失效（401）
 async function showLogin(expired = false) {
   setView("login");
-  $("#loginSis").innerHTML = sisyphus(expired ? "rest" : "push", 160, "slow");
-  const g = $("#userGrid");
+  if (!sayTimer) { nextSaying(); sayTimer = setInterval(nextSaying, 10000); }
+  const g = $("#userGrid"), note = $("#loginNote");
   g.innerHTML = "";
-  const mode = (await api("/api/auth/config").catch(() => ({ mode: "dev" }))).mode;
-  if (mode === "oidc") {  // Keycloak：整頁導去登入，回來時後端已建好 session
+  note.textContent = "";
+  const cfg = await api("/api/auth/config").catch(() => ({ mode: "dev" }));
+  $("#appVer").textContent = cfg.version ? `v${cfg.version}` : "";
+  if (cfg.mode === "oidc") {  // Keycloak：整頁導去登入，回來時後端已建好 session
     const failed = new URLSearchParams(location.search).has("login_error");
-    $("#loginView .vlede").textContent = failed ? "登入沒有完成：請再試一次；若一直失敗，請聯絡管理員確認帳號。"
-      : expired ? "登入已失效，請重新登入。" : "用 Toolmen 帳號登入，進入自己的論文庫。";
-    g.innerHTML = '<a class="card oidc-login" href="/api/auth/login"><span class="cname">用 Toolmen 帳號登入</span></a>';
+    note.textContent = failed ? "登入沒有完成：請再試一次；若一直失敗，請聯絡管理員確認帳號。"
+      : expired ? "登入已失效，請重新登入。" : "";
+    g.innerHTML = `<a class="sso" href="/api/auth/login">${LAMP}以 Toolmen SSO 登入</a>`;
     return;
   }
-  $("#loginView .vlede").textContent = expired ? "登入已失效，點一下自己的名片重新進入。"
+  note.textContent = expired ? "登入已失效，點一下自己的名片重新進入。"
     : "測試登入：免密碼，點一下名片就進入自己的論文庫。";
   try {
     const users = await api("/api/auth/users");
     g.innerHTML = users.length
-      ? users.map((u) => `<button class="card" data-id="${escapeHTML(u.id)}"><span class="uinit">${escapeHTML([...u.name][0])}</span>
-          <span class="cname">${escapeHTML(u.name)}</span></button>`).join("")
+      ? '<div class="cards users">' + users.map((u) => `<button class="card" data-id="${escapeHTML(u.id)}"><span class="uinit">${escapeHTML([...u.name][0])}</span>
+          <span class="cname">${escapeHTML(u.name)}</span></button>`).join("") + "</div>"
       : '<p class="cards-empty">沒有可登入的測試使用者（請在 .env 設定 TEST_USERS）。</p>';
   } catch (e) {
     g.innerHTML = `<p class="cards-empty err">讀不到使用者清單：${escapeHTML(e.message)}</p>`;

@@ -83,7 +83,7 @@ Uid = Annotated[str, Depends(current_user)]
 @app.get("/api/auth/config")
 def auth_config():
     """前端用來決定登入頁長什麼樣：dev＝使用者名片；oidc＝「用 Keycloak 登入」按鈕。"""
-    return {"mode": config.AUTH_MODE}
+    return {"mode": config.AUTH_MODE, "version": config.VERSION}
 
 
 @app.get("/api/auth/users")

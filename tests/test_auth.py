@@ -30,7 +30,7 @@ def _oidc(monkeypatch, kc):
 
 def test_livez_and_config(client):
     assert client.get("/api/livez").json() == {"ok": True}
-    assert client.get("/api/auth/config").json() == {"mode": "dev"}
+    assert client.get("/api/auth/config").json() == {"mode": "dev", "version": config.VERSION}
 
 
 def test_oidc_login_creates_user_and_session(monkeypatch):
