@@ -2,7 +2,7 @@
 # 部署：先建 Secret（見 docs/labse.md），再 kubectl apply -k deploy/k8s-labse
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: embedding
+namespace: aaron-personal
 resources:
   - namespace.yaml
   - pvc.yaml
