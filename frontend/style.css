@@ -248,10 +248,12 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .rtick::after { content: ""; position: absolute; inset: -6px -4px; }  /* 點得到的範圍大一點 */
 .rtick:hover { background: var(--ink); }
 /* safe center：頁面比視窗寬時改成靠左，左半邊才捲得到（一般 center 會切掉） */
-#pages { display: flex; flex-direction: column; align-items: safe center; gap: 28px; }
+/* 頁距跟著倍率（--zs = 倍率 / 1.2，JS 設）：縮放預覽是整片 transform，頁距也被放大；
+   定案後若頁距回到固定 px，紙張之間會跳一下 */
+#pages { display: flex; flex-direction: column; align-items: safe center; gap: calc(28px * var(--zs, 1)); }
 /* 畫面外的頁跳過排版與繪製：拖曳右欄、縮放視窗時只重排看得到的頁（數千個文字層 span）。
    高度由 JS 設 contain-intrinsic-height＝頁高，捲動位置與跳頁不受影響 */
-.prow { display: flex; gap: 18px; content-visibility: auto; }
+.prow { display: flex; gap: calc(18px * var(--zs, 1)); content-visibility: auto; }
 .page, .twin { position: relative; background: white; box-shadow: var(--shadow-page); flex: none; }
 .twin { display: none; }
 #pages.tr-side .twin { display: block; }
@@ -279,7 +281,7 @@ main.nopanel, main.floatpanel { grid-template-columns: var(--libw) minmax(0, 1fr
 .mlabel.novelty { color: var(--novelty); } .mlabel.method { color: var(--method); } .mlabel.result { color: var(--result); }
 /* 寬螢幕：標籤是夾在紙外留白的小紙條，引線箭頭指回原文；--mgut 是留給它們的寬度 */
 @media (min-width: 900px) {
-  #pages { --mgut: 80px; }
+  #pages { --mgut: max(56px, calc(80px * var(--zs, 1))); }
   .prow { padding-inline: var(--mgut); }
   #pages.tr-side .prow { padding-right: 0; }  /* 並排時標籤只放左邊 */
 }

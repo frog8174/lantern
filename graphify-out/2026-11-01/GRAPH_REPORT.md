@@ -1,17 +1,17 @@
 # Graph Report - paper-reader  (2026-11-01)
 
 ## Corpus Check
-- 55 files · ~47,391 words
+- 55 files · ~47,563 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 7 file(s) not represented in the graph (top: (none) 4, .example 1, .css 1)
 
 ## Summary
-- 1211 nodes · 2596 edges · 75 communities (70 shown, 5 thin omitted)
+- 1212 nodes · 2602 edges · 81 communities (74 shown, 7 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 97 edges (avg confidence: 0.92)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fd962f03`
+- Built from commit: `dc5a2b51`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -31,7 +31,7 @@
 - Lantern Paper Reader
 - main.py
 - CLAUDE.md
-- backend/__init__.py
+- sentalign.py
 - Workspace LLM Wiki（MVP）
 - escapeHTML
 - _pdf_path
@@ -86,11 +86,17 @@
 - config.py
 - 功能對照
 - drawOutline
+- backend/__init__.py
+- test_sentalign.py
 - json
 - _ingest
 - k8s-labse/kustomization.yaml
 - k8s-labse/namespace.yaml
 - LaBSE 句向量服務（中英逐句對齊）
+- test_workspaces.py
+- test_align.py
+- test_notes.py
+- addMsg
 
 ## God Nodes (most connected - your core abstractions)
 1. `conn()` - 50 edges
@@ -102,7 +108,7 @@
 7. `cache_get()` - 24 edges
 8. `data` - 24 edges
 9. `cache_set()` - 20 edges
-10. `openPaper()` - 19 edges
+10. `drawHighlights()` - 20 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `資料表（`backend/db.py`）` --references--> `list_papers()`  [INFERRED]
@@ -124,7 +130,7 @@
 - **Automated test suite** — tests_fake_api, tests_sample_pdfs, tests_test_units, tests_test_api [EXTRACTED 0.90]
 - **Floating AI interaction widgets** — frontend_index_selbar, frontend_index_cropbar, frontend_index_aicard, frontend_index_chatwin [INFERRED 0.75]
 
-## Communities (75 total, 5 thin omitted)
+## Communities (81 total, 7 thin omitted)
 
 ### Community 0 - "app.js"
 Cohesion: 0.04
@@ -143,12 +149,12 @@ Cohesion: 0.11
 Nodes (25): add_annotation(), add_message(), add_wiki_message(), add_workspace(), annotation_paper(), clear_messages(), clear_wiki_messages(), conn() (+17 more)
 
 ### Community 4 - "re"
-Cohesion: 0.16
-Nodes (18): _abstract(), apply_ocr(), _author_year_refs(), Block, _clean(), find_texts_rects(), _guess_title(), _is_ref_head() (+10 more)
+Cohesion: 0.15
+Nodes (19): _abstract(), apply_ocr(), _author_year_refs(), Block, _clean(), find_texts_rects(), _guess_title(), _is_ref_head() (+11 more)
 
 ### Community 5 - "test_units.py"
 Cohesion: 0.12
-Nodes (12): citing_contexts(), _translatable(), find_figures(), render_page_png(), llm._ThinkStripper, test_citing_contexts(), test_find_figures(), test_page_blocks_and_render() (+4 more)
+Nodes (12): citing_contexts(), stream_block_translation(), run(), _translatable(), find_figures(), llm._ThinkStripper, test_citing_contexts(), test_find_figures() (+4 more)
 
 ### Community 6 - "containers"
 Cohesion: 0.04
@@ -170,17 +176,17 @@ Nodes (8): Lantern index.html, Floating AI card (aiCard), Chat window (chatWin),
 Cohesion: 0.09
 Nodes (23): AlignMark, AnnotIn, ArxivIn, AskIn, ChatIn, CommentIn, create_workspace(), edit_annotation() (+15 more)
 
-### Community 15 - "backend/__init__.py"
-Cohesion: 0.06
-Nodes (24): align_dp(), _embed(), page_map(), sim(), _spans(), split_en(), split_zh(), _fake() (+16 more)
+### Community 15 - "sentalign.py"
+Cohesion: 0.23
+Nodes (7): align_dp(), _embed(), page_map(), sim(), _spans(), split_en(), split_zh()
 
 ### Community 16 - "Workspace LLM Wiki（MVP）"
 Cohesion: 0.15
 Nodes (12): 1. Wiki 問答（workspace 第三個分頁「論文｜Wiki｜問答」）, 2. 加入論文就自動更新 Wiki（使用者設定）, 3. 閱讀頁反向連結, API, Workspace LLM Wiki（MVP）, 前端, 更新流程（後端，`features.py` 放 prompt）, 決定 (+4 more)
 
 ### Community 17 - "escapeHTML"
-Cohesion: 0.12
-Nodes (38): api(), bibtex(), cardPaper(), cardsBusy(), escapeHTML(), importArxiv(), ingest(), loadAsk() (+30 more)
+Cohesion: 0.11
+Nodes (40): api(), bibtex(), cardPaper(), cardsBusy(), enter(), escapeHTML(), importArxiv(), ingest() (+32 more)
 
 ### Community 18 - "_pdf_path"
 Cohesion: 0.22
@@ -195,16 +201,16 @@ Cohesion: 0.19
 Nodes (18): _and(), apa(), bibtex(), _doi(), _end(), ieee(), _initials(), mla() (+10 more)
 
 ### Community 21 - "aiCard"
-Cohesion: 0.18
-Nodes (19): 逐句對應（並排模式）, addAnnotation(), aiCard(), alignHighlight(), closeAiCard(), commentEditor(), correspond(), explainCrop() (+11 more)
+Cohesion: 0.16
+Nodes (20): 逐句對應（並排模式）, addAnnotation(), aiCard(), alignHighlight(), closeAiCard(), commentEditor(), correspond(), explainCrop() (+12 more)
 
 ### Community 22 - "retrieval.py"
 Cohesion: 0.10
 Nodes (13): load_chunks(), save_chunks(), embed(), _bm25(), build_index(), make_chunks(), search(), _tokens() (+5 more)
 
 ### Community 23 - "pumpTranslation"
-Cohesion: 0.20
-Nodes (14): buildPages(), drawRail(), drawTranslation(), fitText(), loadAlignMap(), pumpTranslation(), queueTranslation(), renderPage() (+6 more)
+Cohesion: 0.18
+Nodes (16): buildPages(), clearCrop(), drawRail(), drawTranslation(), fitText(), loadAlignMap(), pumpTranslation(), queueTranslation() (+8 more)
 
 ### Community 24 - "data"
 Cohesion: 0.07
@@ -239,8 +245,8 @@ Cohesion: 0.14
 Nodes (6): allow_duplicates(), bob(), client(), fake_server(), papers(), pdfs()
 
 ### Community 32 - "features.py"
-Cohesion: 0.13
-Nodes (20): _bib_arxiv(), _bib_llm(), _bib_s2(), chat_messages(), cite_reason_messages(), _est_tokens(), fetch_bib(), full_text_fits() (+12 more)
+Cohesion: 0.14
+Nodes (18): _bib_arxiv(), _bib_llm(), _bib_s2(), chat_messages(), cite_reason_messages(), _est_tokens(), fetch_bib(), full_text_fits() (+10 more)
 
 ### Community 34 - "4. 設計提案"
 Cohesion: 0.05
@@ -263,7 +269,7 @@ Cohesion: 0.19
 Nodes (14): cache_get(), cache_set(), s2_paper_id(), align_map(), _align_map(), _block_translation(), _build_align_map(), _ensure_bib() (+6 more)
 
 ### Community 39 - "pymupdf"
-Cohesion: 0.47
+Cohesion: 0.44
 Nodes (5): authoryear(), make_all(), numeric(), scanned(), _text()
 
 ### Community 40 - "renderWiki"
@@ -291,8 +297,8 @@ Cohesion: 0.40
 Nodes (3): ocr_image(), _ocr_pages(), one()
 
 ### Community 46 - "s2_get"
-Cohesion: 0.14
-Nodes (10): _check(), recommend(), s2_get(), S2Error, API, 前端（論文卡）, 決定, 論文卡：備註、星號、排序、複製引用 (+2 more)
+Cohesion: 0.12
+Nodes (12): _check(), _guess_ref_title(), lookup_reference(), recommend(), s2_get(), S2Error, API, 前端（論文卡） (+4 more)
 
 ### Community 47 - "ingress.yaml"
 Cohesion: 0.10
@@ -374,17 +380,21 @@ Nodes (4): startupProbe, failureThreshold, httpGet, periodSeconds
 Cohesion: 0.50
 Nodes (4): template, terminationGracePeriodSeconds, metadata, spec
 
-### Community 67 - "config.py"
-Cohesion: 0.14
-Nodes (4): _load_dotenv(), test_delete_paper_deletes_note(), test_note_crud_and_conflict(), test_note_draft()
-
 ### Community 68 - "功能對照"
-Cohesion: 0.16
-Nodes (10): explain_messages(), _history_block(), image_messages(), local_context(), page_translate_messages(), stream_block_translation(), run(), translate_messages() (+2 more)
+Cohesion: 0.20
+Nodes (9): explain_messages(), _history_block(), image_messages(), local_context(), page_translate_messages(), translate_messages(), match_author_year(), 功能對照 (+1 more)
 
 ### Community 69 - "drawOutline"
-Cohesion: 0.16
-Nodes (14): addCopy(), addMsg(), drawOutline(), enter(), goToPage(), hideFigure(), icon(), loadChat() (+6 more)
+Cohesion: 0.29
+Nodes (7): drawOutline(), goToPage(), hideFigure(), markOutline(), renderOutline(), setLibDrawer(), showFigure()
+
+### Community 70 - "backend/__init__.py"
+Cohesion: 0.23
+Nodes (4): FakeKC, _oidc(), test_oidc_login_creates_user_and_session(), test_oidc_login_failure_redirects()
+
+### Community 71 - "test_sentalign.py"
+Cohesion: 0.25
+Nodes (7): _cut(), _fake_embed(), _sim_from(), test_dp_merge_and_skip(), test_dp_one_to_one(), test_split_en_keeps_abbreviations_and_offsets(), test_split_zh()
 
 ### Community 72 - "json"
 Cohesion: 0.17
@@ -406,25 +416,37 @@ Nodes (4): apiVersion, kind, metadata, name
 Cohesion: 0.40
 Nodes (4): LaBSE 句向量服務（中英逐句對齊）, Lantern 端設定, 要注意, 部署（`deploy/k8s-labse/`）
 
+### Community 78 - "test_align.py"
+Cohesion: 0.36
+Nodes (5): _fake(), test_align_invalid_falls_back(), test_align_scoped_to_owner(), test_align_valid_substring(), _translated_block()
+
+### Community 79 - "test_notes.py"
+Cohesion: 0.29
+Nodes (3): test_delete_paper_deletes_note(), test_note_crud_and_conflict(), test_note_draft()
+
+### Community 80 - "addMsg"
+Cohesion: 0.83
+Nodes (4): addCopy(), addMsg(), loadChat(), sendChat()
+
 ## Knowledge Gaps
 - **13 isolated node(s):** `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules`, `/api/health endpoint`, `BM25 retrieval` (+8 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 484 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 483 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Lantern AI Paper Reader` connect `retrieval.py` to `features.py`, `app.js`, `db.py`, `re`, `llm.py`?**
-  _High betweenness centrality (0.192) - this node is a cross-community bridge._
+  _High betweenness centrality (0.191) - this node is a cross-community bridge._
 - **What connects `lantern-paper-reader`, `graphify-out/graph.json`, `graphify usage rules` to the rest of the system?**
   _13 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `app.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.03623611922852133 - nodes in this community are weakly interconnected._
-- **Why does `Lantern — 個人用 AI 論文閱讀器` connect `Lantern — 個人用 AI 論文閱讀器` to `_ThinkStripper`, `功能對照`, `re`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+  _Cohesion score 0.03690260133091349 - nodes in this community are weakly interconnected._
+- **Why does `current_user()` connect `4. 設計提案` to `logout`, `db.py`, `main.py`?**
+  _High betweenness centrality (0.016) - this node is a cross-community bridge._
 - **Should `test_api.py` be split into smaller, more focused modules?**
   _Cohesion score 0.0975609756097561 - nodes in this community are weakly interconnected._
-- **Why does `current_user()` connect `4. 設計提案` to `logout`, `db.py`, `main.py`?**
+- **Why does `功能對照` connect `功能對照` to `features.py`, `db.py`, `Lantern — 個人用 AI 論文閱讀器`, `test_units.py`, `re`, `ocr_image`, `s2_get`, `complete_json`, `auto_highlight`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
 - **Should `db.py` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._

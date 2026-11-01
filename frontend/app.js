@@ -340,6 +340,7 @@ async function watchTranslation(id, seen = false) {
 function buildPages() {
   const wrap = $("#pages");
   wrap.innerHTML = "";
+  wrap.style.setProperty("--zs", S.scale / 1.2);  // 頁距跟著倍率（style.css #pages）
   const sc = S.paper.scanned_pages.length, oc = S.paper.ocr_pages.length;
   if (sc) {  // 掃描版提示
     const b = document.createElement("div");
@@ -663,6 +664,7 @@ function zoom(f, at) {
   S.scale = Math.min(3, Math.max(0.5, +(S.scale * f).toFixed(2)));
   if (S.scale === s0) return;
   clearCrop();  // 框選框是 px 定位，縮放後會錯位
+  $("#pages").style.setProperty("--zs", S.scale / 1.2);
   const k = S.scale / s0;
   S.pages.forEach((pg, i) => {
     const [w, h] = S.paper.page_sizes[i];
