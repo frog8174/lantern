@@ -653,6 +653,17 @@ function zoom(f) {
 }
 $("#btnZoomIn").onclick = () => zoom(1.15);
 $("#btnZoomOut").onclick = () => zoom(1 / 1.15);
+// Ctrl／⌘＋滾輪（觸控板捏合也是這個事件）：攔下瀏覽器整頁縮放，改縮論文。
+// 累積倍率、停手 150ms 才重建頁面（buildPages 很重），期間百分比先即時跟著變
+let wheelF = 1, wheelT = 0;
+$("#viewer").addEventListener("wheel", (e) => {
+  if (!(e.ctrlKey || e.metaKey) || !S.paper) return;
+  e.preventDefault();
+  wheelF *= Math.exp(-e.deltaY * 0.002);  // 一格滾輪（deltaY≈100）約 1.2 倍
+  $("#zoomLabel").textContent = `${Math.round(Math.min(3, Math.max(0.5, S.scale * wheelF)) * 100)}%`;
+  clearTimeout(wheelT);
+  wheelT = setTimeout(() => { const f = wheelF; wheelF = 1; zoom(f); }, 150);
+}, { passive: false });
 // 窄螢幕的左欄抽屜
 function setLibDrawer(on) {
   $("main").classList.toggle("showlib", on);
