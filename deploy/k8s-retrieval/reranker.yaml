@@ -1,0 +1,94 @@
+# bge-reranker-v2-m3：把粗撈的候選段落依「和問題多相關」重新排序（cross-encoder，跨語言）。
+# vLLM 的 /v1/rerank（Jina／Cohere 格式），模型名 bge-reranker
+# 叢集內：http://bge-reranker.aaron-personal.svc.cluster.local:8000/v1　對外：https://bge-reranker.toolmen.bime.ntu.edu.tw/v1
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bge-reranker
+  labels: { app: bge-reranker }
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: bge-reranker }
+  template:
+    metadata:
+      labels: { app: bge-reranker }
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: toolmen-server3
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.28.0
+          command: [/bin/bash, -c]
+          args:
+            - |-
+              export CUDA_VISIBLE_DEVICES=0 CUDA_DEVICE_ORDER=PCI_BUS_ID
+              exec vllm serve BAAI/bge-reranker-v2-m3 \
+                --served-model-name bge-reranker \
+                --runner pooling \
+                --dtype float16 \
+                --max-model-len 1024 \
+                --gpu-memory-utilization 0.08 \
+                --port 8000
+          # 模型是 XLMRobertaForSequenceClassification，vLLM 會自動當成 score/rerank 模型
+          env:
+            - name: VLLM_API_KEY
+              valueFrom: { secretKeyRef: { name: labse-secrets, key: VLLM_API_KEY } }
+            - { name: HF_HOME, value: /cache/huggingface }
+          ports:
+            - { name: http, containerPort: 8000 }
+          volumeMounts:
+            - { name: hf-cache, mountPath: /cache }
+            - { name: shm, mountPath: /dev/shm }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests: { memory: 4Gi }
+            limits: { memory: 8Gi }
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim: { claimName: hf-cache-retrieval }
+        - name: shm
+          emptyDir: { medium: Memory, sizeLimit: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bge-reranker
+spec:
+  selector: { app: bge-reranker }
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bge-reranker
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: cert-manager-prod
+spec:
+  ingressClassName: traefik-private
+  tls:
+    - hosts: [bge-reranker.toolmen.bime.ntu.edu.tw]
+      secretName: bge-reranker-tls
+  rules:
+    - host: bge-reranker.toolmen.bime.ntu.edu.tw
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: bge-reranker, port: { name: http } }

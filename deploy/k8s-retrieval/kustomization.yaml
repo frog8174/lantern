@@ -1,0 +1,9 @@
+# 論文聊天的檢索：bge-m3（跨語言段落向量，/v1/embeddings）＋ bge-reranker-v2-m3（重新排序，/v1/rerank）。
+# 和 LaBSE 同 namespace、同一把 VLLM_API_KEY（Secret labse-secrets）。部署與驗證見 docs/retrieval.md
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: aaron-personal
+resources:
+  - pvc.yaml
+  - bge-m3.yaml
+  - reranker.yaml
