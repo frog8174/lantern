@@ -1,5 +1,5 @@
 # bge-m3：中英跨語言段落向量（中文問題 ↔ 英文段落），vLLM OpenAI 相容 /v1/embeddings，模型名 bge-m3
-# 叢集內：http://bge-m3.aaron-personal.svc.cluster.local:8000/v1　對外（本機開發）：https://bge-m3.toolmen.bime.ntu.edu.tw/v1
+# 叢集內：http://bge-m3.aaron-personal.svc.cluster.local:8000/v1　對外（本機開發）：https://lantern-bge.toolmen.bime.ntu.edu.tw/v1
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,10 +31,10 @@ spec:
                 --convert embed \
                 --dtype float16 \
                 --max-model-len 1024 \
-                --gpu-memory-utilization 0.08 \
+                --gpu-memory-utilization 0.03 \
                 --port 8000
           # max-model-len：Lantern 的段落約 800 字元（~200 token），1024 綽綽有餘，也省顯存。
-          # gpu-memory-utilization：權重 fp16 約 1.1 GB；0.08 是以 24 GB 以上的卡估的，卡小就調高
+          # gpu-memory-utilization：權重 fp16 約 1.1 GB；0.03 要 48 GB 以上的卡才放得下，啟動報顯存不足就調高
           env:
             - name: VLLM_API_KEY
               valueFrom: { secretKeyRef: { name: labse-secrets, key: VLLM_API_KEY } }
@@ -84,10 +84,10 @@ metadata:
 spec:
   ingressClassName: traefik-private
   tls:
-    - hosts: [bge-m3.toolmen.bime.ntu.edu.tw]
-      secretName: bge-m3-tls
+    - hosts: [lantern-bge.toolmen.bime.ntu.edu.tw]
+      secretName: lantern-bge-tls
   rules:
-    - host: bge-m3.toolmen.bime.ntu.edu.tw
+    - host: lantern-bge.toolmen.bime.ntu.edu.tw
       http:
         paths:
           - path: /

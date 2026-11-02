@@ -1,6 +1,6 @@
 # bge-reranker-v2-m3：把粗撈的候選段落依「和問題多相關」重新排序（cross-encoder，跨語言）。
 # vLLM 的 /v1/rerank（Jina／Cohere 格式），模型名 bge-reranker
-# 叢集內：http://bge-reranker.aaron-personal.svc.cluster.local:8000/v1　對外：https://bge-reranker.toolmen.bime.ntu.edu.tw/v1
+# 叢集內：http://bge-reranker.aaron-personal.svc.cluster.local:8000/v1　對外：https://lantern-reranker.toolmen.bime.ntu.edu.tw/v1
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -82,10 +82,10 @@ metadata:
 spec:
   ingressClassName: traefik-private
   tls:
-    - hosts: [bge-reranker.toolmen.bime.ntu.edu.tw]
-      secretName: bge-reranker-tls
+    - hosts: [lantern-reranker.toolmen.bime.ntu.edu.tw]
+      secretName: lantern-reranker-tls
   rules:
-    - host: bge-reranker.toolmen.bime.ntu.edu.tw
+    - host: lantern-reranker.toolmen.bime.ntu.edu.tw
       http:
         paths:
           - path: /

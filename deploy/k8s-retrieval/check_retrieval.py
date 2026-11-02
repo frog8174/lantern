@@ -29,12 +29,12 @@ def cos(a, b):
     return sum(x * y for x, y in zip(a, b)) / math.sqrt(sum(x * x for x in a) * sum(y * y for y in b))
 
 
-vecs = [d["embedding"] for d in post("bge-m3", "embeddings", {"model": "bge-m3", "input": [Q, *DOCS]})["data"]]
+vecs = [d["embedding"] for d in post("lantern-bge", "embeddings", {"model": "bge-m3", "input": [Q, *DOCS]})["data"]]
 sims = [cos(vecs[0], v) for v in vecs[1:]]
 print("bge-m3   dim", len(vecs[0]), "cosine", [round(s, 3) for s in sims])
 assert len(vecs[0]) == 1024 and sims[0] == max(sims), "bge-m3：損失函數那段應該最相似"
 
-res = post("bge-reranker", "rerank", {"model": "bge-reranker", "query": Q, "documents": DOCS})["results"]
+res = post("lantern-reranker", "rerank", {"model": "bge-reranker", "query": Q, "documents": DOCS})["results"]
 order = [r["index"] for r in res]
 print("reranker order", order, "scores", [round(r["relevance_score"], 3) for r in res])
 assert order[0] == 0, "reranker：損失函數那段應該排第一"
