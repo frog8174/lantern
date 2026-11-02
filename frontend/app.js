@@ -2686,14 +2686,14 @@ function ago(t) {
 /** 首頁方塊：上半部疊著最新 3 篇的首頁縮圖（像桌上一疊紙），下面是名稱、篇數與更新時間、常見標籤。
  *  w = {id, name, count, recent, updated, tags}；沒有論文時疊紙的位置換成休息的薛西弗斯。 */
 function tile(w, cls = "") {
-  const sheets = w.recent.slice(0, 3).reverse().map((pid, i, a) =>
+  const sheets = (w.recent || []).slice(0, 3).reverse().map((pid, i, a) =>
     `<img class="sheet s${a.length - 1 - i}" src="/api/papers/${encodeURIComponent(pid)}/thumb.png" alt="" loading="lazy">`).join("");
   const meta = w.count ? `${w.count} 篇${w.updated ? `，${ago(w.updated)}更新` : ""}` : "還沒有論文";
   return `<button class="card ${cls}${w.count ? "" : " bare"}" data-id="${escapeHTML(w.id)}">
   <span class="cstack" aria-hidden="true">${w.count ? sheets : sisyphus("rest", 96)}</span>
   ${cls === "all" ? '<svg class="clamp" aria-hidden="true"><use href="#i-lantern"/></svg>' : ""}
   <span class="cname">${escapeHTML(w.name)}</span><span class="ccount">${meta}</span>
-  ${w.tags.length ? `<span class="ctags">${w.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</span>` : ""}</button>`;
+  ${w.tags?.length ? `<span class="ctags">${w.tags.map((t) => `#${escapeHTML(t)}`).join(" ")}</span>` : ""}</button>`;
 }
 /** 「全部論文」的卡片資料：從已載入的論文庫算（後端只替研究主題算）。 */
 function allTile() {
