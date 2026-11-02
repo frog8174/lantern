@@ -162,6 +162,15 @@
     <span>上傳後先在背景把整篇對照翻譯跑完<br><span class="muted small">打開論文時譯文已經備好；每篇論文會多花一次整篇翻譯的 token。</span></span></label>
   <label class="setting"><input type="checkbox" id="setAutoWiki">
     <span>論文加入研究主題就自動更新 Wiki<br><span class="muted small">不必再到 Wiki 分頁按「更新 Wiki」；每加一篇會多花一次整理 Wiki 的 token。</span></span></label>
+  <p><button id="btnUsage" class="link" hidden>查看 API 用量與花費</button></p>
+</dialog>
+
+<!-- API 用量：只有 ADMIN_USERS 看得到（docs/usage.md） -->
+<dialog id="usageDlg" class="dlg usage" aria-labelledby="usageHead">
+  <div class="row"><b id="usageHead">API 用量</b>
+    <select id="usageDays" aria-label="期間"><option value="1">最近 24 小時</option><option value="7">最近 7 天</option><option value="30" selected>最近 30 天</option></select>
+    <button class="icon" id="usageClose" title="關閉" aria-label="關閉"><svg><use href="#i-close"/></svg></button></div>
+  <div id="usageBody" class="md" aria-live="polite"></div>
 </dialog>
 
 <main>

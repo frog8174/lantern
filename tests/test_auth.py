@@ -42,7 +42,7 @@ def test_oidc_login_creates_user_and_session(monkeypatch):
         assert c.get("/api/me").status_code == 401
         r = c.get("/api/auth/callback?code=x&state=y", follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"] == "/"
-        assert c.get("/api/me").json() == {"id": "kc-sub-123", "name": "陳同學"}
+        assert c.get("/api/me").json() == {"id": "kc-sub-123", "name": "陳同學", "email": "a@b.tw", "admin": False}
         assert c.get("/api/papers").json() == []                        # 新使用者：空的論文庫
         assert c.get("/api/auth/users").status_code == 404              # 測試名片清單只在 dev
         out = c.post("/api/auth/logout").json()

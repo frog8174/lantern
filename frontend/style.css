@@ -884,6 +884,11 @@ button[data-armed] { color: var(--seal); }
 .tiles > .inline-in { align-self: center; width: 100%; }
 .dlg { border: 1px solid var(--rule-strong); border-radius: var(--radius-dlg); background: var(--panel);
   color: var(--ink); box-shadow: var(--shadow-float); width: min(520px, calc(100vw - 32px)); max-height: 70vh; padding: 12px 16px 16px; }
+.dlg.usage { width: min(720px, calc(100vw - 32px)); max-height: 85vh; }
+.dlg.usage #usageDays { margin-left: auto; margin-right: 8px; }
+.dlg.usage h3 { font-size: 15px; margin: 1em 0 .2em; }
+.dlg.usage td:not(:first-child), .dlg.usage th { text-align: right; white-space: nowrap; }
+.dlg.usage td:first-child { overflow-wrap: anywhere; }
 .dlg::backdrop { background: var(--backdrop); }
 .dlg .setting { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; max-width: 42ch; cursor: pointer; line-height: 1.5; }
 .dlg .setting input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--ink); }

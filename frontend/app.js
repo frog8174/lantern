@@ -2658,6 +2658,7 @@ async function showLogin(expired = false) {
 
 async function enter(user) {
   $("#userName").textContent = user.name;
+  $("#btnUsage").hidden = !user.admin;
   const [id, p, aid] = location.hash.slice(1).split("/");
   if (id) openAt(id, +(p || "").slice(1), aid).catch(showHome); else showHome();
 }
@@ -3282,6 +3283,29 @@ $("#setAutoTranslate").onchange = $("#setAutoWiki").onchange = async () => {
     body: { auto_translate: $("#setAutoTranslate").checked, auto_wiki: $("#setAutoWiki").checked } }));
 };
 $("#setClose").onclick = () => $("#setDlg").close();
+
+/* ---------------- API 用量（管理者，docs/usage.md） ---------------- */
+const TASK_NAMES = { chat: "聊天", explain: "解釋選取", translate: "翻譯", summary: "摘要", highlight: "自動標重點",
+  outline: "AI 大綱", cite: "引用", suggest: "建議問題", wiki: "Wiki", align: "對齊", note: "筆記草稿",
+  vision: "看圖", ocr: "OCR", health: "連線檢查" };
+const usd = (n) => "$" + (n || 0).toFixed(n >= 1 ? 2 : 4);
+const hitRate = (r) => { const all = (r.input || 0) + (r.cache_write || 0) + (r.cache_read || 0);
+  return all ? Math.round(100 * (r.cache_read || 0) / all) + "%" : "–"; };
+const usageTable = (head, rows, name) => rows.length ? `<h3>${head}</h3><table><thead><tr><th></th><th>花費</th><th>次數</th><th>快取命中</th></tr></thead><tbody>${
+  rows.map((r) => `<tr><td>${escapeHTML(name(r))}</td><td>${usd(r.cost)}</td><td>${r.calls}</td><td>${hitRate(r)}</td></tr>`).join("")}</tbody></table>` : "";
+async function showUsage() {
+  const r = await api(`/api/admin/usage?days=${$("#usageDays").value}`), t = r.total;
+  $("#usageBody").innerHTML = !t.calls ? `<p class="muted">這段期間還沒有呼叫 Claude。</p>` :
+    `<p>共 <b>${usd(t.cost)}</b>，${t.calls} 次呼叫，快取命中 ${hitRate(t)}。<span class="muted small">依價目表估算，實際帳單以 Anthropic Console 為準。</span></p>` +
+    usageTable("依功能", r.by_task, (x) => TASK_NAMES[x.task] || x.task) +
+    usageTable("依模型", r.by_model, (x) => x.model) +
+    usageTable("依使用者", r.by_user, (x) => x.who) +
+    usageTable("最花錢的論文", r.top_papers, (x) => x.title || "（已刪除）") +
+    usageTable("每天", r.daily, (x) => x.day);
+}
+$("#btnUsage").onclick = async () => { $("#setDlg").close(); $("#usageDlg").showModal(); await showUsage(); };
+$("#usageDays").onchange = showUsage;
+$("#usageClose").onclick = () => $("#usageDlg").close();
 $("#btnLogout").onclick = async () => {
   const r = await api("/api/auth/logout", { method: "POST" });
   if (r.logout_url) { location.href = r.logout_url; return; }  // Keycloak：連同 Keycloak 那邊一起登出，再回到首頁

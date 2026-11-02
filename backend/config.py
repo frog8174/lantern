@@ -107,6 +107,8 @@ LLM_MOCK = _bool("LLM_MOCK", False)
 # dev：測試登入（選使用者、免密碼，cookie 未簽章），只能自己開發用
 VERSION = os.environ.get("APP_VERSION", "0.2.0")  # 登入頁右下角顯示；部署新版時跟著映像 tag 改
 AUTH_MODE = os.environ.get("AUTH_MODE", "dev").lower()  # dev＝選測試使用者；oidc＝Keycloak（docs/auth.md）
+# 看得到「用量」的人：email（oidc）或使用者 id（dev），逗號分隔
+ADMIN_USERS = {u.strip().lower() for u in os.environ.get("ADMIN_USERS", "").split(",") if u.strip()}
 TEST_USERS = [u.strip() for u in os.environ.get("TEST_USERS", "alice,bob").split(",") if u.strip()]
 # OIDC（Keycloak）。OIDC_ISSUER 必須和 token 的 iss 完全一樣；PUBLIC_BASE_URL 用來組 redirect URI
 OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/")

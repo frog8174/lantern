@@ -13,15 +13,15 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/config.py": {
-    "mtime": 1793512746.051942,
-    "seen": 1793512951.1758952,
-    "ast_hash": "82caec944bc0435ad3db043d12e387d3",
+    "mtime": 1793608865.8029335,
+    "seen": 1793609068.502347,
+    "ast_hash": "e4267ebbe96d8b98d157d00670fe11e3",
     "semantic_hash": ""
   },
   "backend/db.py": {
-    "mtime": 1793542141.8910527,
-    "seen": 1793542280.0590436,
-    "ast_hash": "2d6d3a3c3cc8b93028239adcd71448d0",
+    "mtime": 1793608865.801932,
+    "seen": 1793609068.502347,
+    "ast_hash": "d1bd68aa841b83fe7b59ae93c61902b0",
     "semantic_hash": ""
   },
   "backend/features.py": {
@@ -31,15 +31,15 @@
     "semantic_hash": ""
   },
   "backend/llm.py": {
-    "mtime": 1793447451.3996527,
-    "seen": 1793463620.6364586,
-    "ast_hash": "9592c77800f4080b124d5881c49a8a6c",
+    "mtime": 1793608844.9645636,
+    "seen": 1793609068.502347,
+    "ast_hash": "ba947218a450b3abe03bad447a9d1e28",
     "semantic_hash": ""
   },
   "backend/main.py": {
-    "mtime": 1793512567.794875,
-    "seen": 1793512586.5831888,
-    "ast_hash": "71453eb278388f2d7ded2d57703580ae",
+    "mtime": 1793608865.8034382,
+    "seen": 1793609068.502347,
+    "ast_hash": "9cfaa999ff2ab408f0bad75ffc33e99e",
     "semantic_hash": ""
   },
   "backend/pdf_parse.py": {
@@ -55,9 +55,9 @@
     "semantic_hash": ""
   },
   "frontend/app.js": {
-    "mtime": 1793542242.7422552,
-    "seen": 1793542280.0590436,
-    "ast_hash": "ef2a01766331d2caded45c0daca8917f",
+    "mtime": 1793608976.3846064,
+    "seen": 1793609068.502347,
+    "ast_hash": "a78307c1ad73867b7f348a0c2f95efe5",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -91,9 +91,9 @@
     "semantic_hash": ""
   },
   "tests/test_anthropic.py": {
-    "mtime": 1793457626.7003956,
-    "seen": 1793463620.6364586,
-    "ast_hash": "69b8d32372ed15f844202cf96303f35a",
+    "mtime": 1793608879.782884,
+    "seen": 1793609068.502347,
+    "ast_hash": "064147bf732a17d6d67aea5758a00b2c",
     "semantic_hash": ""
   },
   "tests/test_api.py": {
@@ -121,15 +121,15 @@
     "semantic_hash": ""
   },
   "frontend/index.html": {
-    "mtime": 1793538028.640608,
-    "seen": 1793538057.4418335,
-    "ast_hash": "1da85581205219d39dd3fb2fcdf92429",
+    "mtime": 1793608976.3829064,
+    "seen": 1793609068.502347,
+    "ast_hash": "864df025ab422c8ed1a9326d41126ade",
     "semantic_hash": ""
   },
   "tests/test_workspaces.py": {
-    "mtime": 1793542141.8920567,
-    "seen": 1793542280.0590436,
-    "ast_hash": "59e1695cc6d77da3d4bd32b2e93078d4",
+    "mtime": 1793608938.1599607,
+    "seen": 1793609068.502347,
+    "ast_hash": "2ff811f7983b8c5f45e9343c5ce822f5",
     "semantic_hash": ""
   },
   "docs/workspaces.md": {
@@ -259,15 +259,15 @@
     "semantic_hash": ""
   },
   "tests/test_auth.py": {
-    "mtime": 1793504294.4972014,
-    "seen": 1793504435.014687,
-    "ast_hash": "c0609d3bbd965ccba62f9b3696029578",
+    "mtime": 1793608897.7616713,
+    "seen": 1793609068.502347,
+    "ast_hash": "142bbdffdc6c8728e83d60f46ccb5978",
     "semantic_hash": ""
   },
   "deploy/k8s/configmap.yaml": {
-    "mtime": 1793512746.051942,
-    "seen": 1793512951.1758952,
-    "ast_hash": "f53183d542dbdb38333c64cb66a1db46",
+    "mtime": 1793609002.5147808,
+    "seen": 1793609068.502347,
+    "ast_hash": "f6d4616ab525c069d5fda3939a223597",
     "semantic_hash": ""
   },
   "deploy/k8s/deployment.yaml": {
@@ -418,6 +418,48 @@
     "mtime": 1793512567.8003874,
     "seen": 1793512586.5831888,
     "ast_hash": "15b007fe409f1cf6cd6d67f8e7993e6d",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-retrieval/bge-m3.yaml": {
+    "mtime": 1793594258.832317,
+    "seen": 1793609068.502347,
+    "ast_hash": "78803050e06c4b6ca8f79c43fd9fb75d",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-retrieval/check_retrieval.py": {
+    "mtime": 1793594072.110059,
+    "seen": 1793609068.502347,
+    "ast_hash": "d526bbe6a967bc13e9103ff051077c88",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-retrieval/kustomization.yaml": {
+    "mtime": 1793593766.4680574,
+    "seen": 1793609068.502347,
+    "ast_hash": "76d43c9c3c3256ec6f8f8b71dc13c842",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-retrieval/pvc.yaml": {
+    "mtime": 1793593766.9010272,
+    "seen": 1793609068.502347,
+    "ast_hash": "c7033136337e6fc48829cbeee5fb108d",
+    "semantic_hash": ""
+  },
+  "deploy/k8s-retrieval/reranker.yaml": {
+    "mtime": 1793594254.9817798,
+    "seen": 1793609068.502347,
+    "ast_hash": "9cded9ba7b72b85ce726d2c34635c559",
+    "semantic_hash": ""
+  },
+  "docs/retrieval.md": {
+    "mtime": 1793594072.1408243,
+    "seen": 1793609068.502347,
+    "ast_hash": "8dcd23e447ddaec56ede199204e50c0b",
+    "semantic_hash": ""
+  },
+  "docs/usage.md": {
+    "mtime": 1793609002.538393,
+    "seen": 1793609068.502347,
+    "ast_hash": "61fba3947dff80a8799238e02aac51df",
     "semantic_hash": ""
   }
 }

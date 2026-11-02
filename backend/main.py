@@ -70,13 +70,19 @@ PDF_DIR = config.DATA_DIR / "pdfs"
 
 
 # ---------------- 登入（docs/auth.md） ----------------
-def current_user(request: Request, uid: str | None = Cookie(None)) -> str:
-    """oidc：讀簽章 session 裡的 Keycloak sub；dev：讀測試用的 uid cookie（未簽章，只能本機開發用）。"""
+async def current_user(request: Request, uid: str | None = Cookie(None)) -> str:
+    """oidc：讀簽章 session 裡的 Keycloak sub；dev：讀測試用的 uid cookie（未簽章，只能本機開發用）。
+    async：在請求本身的 context 裡設定 llm.usage_ctx，用量才記得到是誰。"""
     if config.AUTH_MODE == "oidc":
         uid = request.session.get("uid")
     if not uid or not db.get_user(uid):
         raise HTTPException(401, "not logged in")
+    llm.usage_ctx.set((uid, None))
     return uid
+
+
+def _is_admin(u: dict) -> bool:
+    return bool({u["id"].lower(), (u.get("email") or "").lower()} & config.ADMIN_USERS)
 
 
 Uid = Annotated[str, Depends(current_user)]
@@ -159,7 +165,15 @@ def livez():
 
 @app.get("/api/me")
 def me(uid: Uid):
-    return db.get_user(uid)
+    u = db.get_user(uid)
+    return u | {"admin": _is_admin(u)}
+
+
+@app.get("/api/admin/usage")
+def admin_usage(uid: Uid, days: int = 30):
+    if not _is_admin(db.get_user(uid)):
+        raise HTTPException(403, "admins only")
+    return db.usage_report(max(1, min(days, 365)))
 
 
 class SettingsIn(BaseModel):
@@ -183,6 +197,7 @@ def _paper_or_404(pid: str, uid: str) -> dict:
     p = db.get_paper(pid)
     if not p or p["user_id"] != uid:
         raise HTTPException(404, "paper not found")
+    llm.usage_ctx.set((uid, pid))
     return p
 
 
@@ -252,6 +267,7 @@ def _duplicate(uid: str, pid: str, path: str, workspace: str | None) -> dict:
 
 
 async def _ingest(uid: str, pid: str, filename: str, path: str, workspace: str | None) -> dict:
+    llm.usage_ctx.set((uid, pid))  # OCR、預翻譯、書目都算這篇
     with open(path, "rb") as f:
         sha = hashlib.sha256(f.read()).hexdigest()
     if dup := db.find_duplicate(uid, sha256=sha):  # 同一個檔案：連解析都不用

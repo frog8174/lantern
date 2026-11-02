@@ -12,13 +12,14 @@ import asyncio
 import base64
 import json
 import re
+from contextvars import ContextVar
 from typing import AsyncIterator
 
 import anthropic
 import openai
 from openai import AsyncOpenAI
 
-from . import config
+from . import config, db
 
 _chat = AsyncOpenAI(base_url=config.LLM_BASE_URL, api_key=config.LLM_API_KEY)
 _vision = AsyncOpenAI(base_url=config.VLM_BASE_URL, api_key=config.VLM_API_KEY)
@@ -148,15 +149,16 @@ async def stream_chat(messages: list, *, task: str, **kw) -> AsyncIterator[str]:
         return
     provider, client, model = route(task)
     effort = config.TASK_EFFORT.get(task) or config.LLM_EFFORT
-    async for text in _stream(client, model, messages, provider=provider, effort=effort, **kw):
+    async for text in _stream(client, model, messages, provider=provider, effort=effort, task=task, **kw):
         yield text
 
 
 async def _stream(client: AsyncOpenAI, model: str, messages: list, *,
-                  provider: str | None = None, effort: str | None = None, **kw) -> AsyncIterator[str]:
+                  provider: str | None = None, effort: str | None = None, task: str = "health",
+                  **kw) -> AsyncIterator[str]:
     if (provider or config.LLM_PROVIDER) == "anthropic":
         async with _slots:
-            async for text in _claude_stream(model, messages, effort or config.LLM_EFFORT):
+            async for text in _claude_stream(model, messages, effort or config.LLM_EFFORT, task):
                 yield text
         return
     stripper = _ThinkStripper()
@@ -219,7 +221,32 @@ def _to_claude(messages: list) -> tuple[str, list]:
     return "\n\n".join(system), out
 
 
-async def _claude_stream(model: str, messages: list, effort: str) -> AsyncIterator[str]:
+# ---------- 用量記錄（docs/usage.md）----------
+# 誰、哪篇論文在用：current_user / _paper_or_404 設定；背景 task 建立時會複製一份，所以預翻譯也算得到
+usage_ctx: ContextVar[tuple[str | None, str | None]] = ContextVar("usage_ctx", default=(None, None))
+# 美元／百萬 token：(輸入, 輸出, 快取讀取)；快取寫入（5 分鐘）＝輸入 ×1.25。價目變了改這裡
+PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20), "claude-sonnet-5-5": (2.0, 10.0, 0.20),
+          "claude-haiku-5-5": (0.10, 0.50, 0.01)}
+
+
+def cost_usd(model: str, inp: int, out: int, cache_write: int, cache_read: int) -> float:
+    pin, pout, pread = PRICES.get(model, (0.0, 0.0, 0.0))  # 不在表上（自架 vLLM）算 0
+    if model == "claude-haiku-5-5" and inp + cache_write + cache_read > 100_000:
+        pin, pout, pread = pin * 5, pout * 5, pread * 5  # Haiku 5.5 超過 100K 輸入走長文價
+    return (inp * pin + cache_write * pin * 1.25 + cache_read * pread + out * pout) / 1e6
+
+
+def _record(task: str, model: str, u) -> None:
+    uid, pid = usage_ctx.get()
+    w, r = u.cache_creation_input_tokens or 0, u.cache_read_input_tokens or 0
+    try:
+        db.add_usage(uid, pid, task, model, u.input_tokens, u.output_tokens, w, r,
+                     cost_usd(model, u.input_tokens, u.output_tokens, w, r))
+    except Exception as e:  # 記錄失敗不能讓回答失敗
+        print(f"[usage] {type(e).__name__}: {e}")
+
+
+async def _claude_stream(model: str, messages: list, effort: str, task: str = "health") -> AsyncIterator[str]:
     system, msgs = _to_claude(messages)
     # 不送 temperature：Claude 4.7 之後的模型會回 400。
     # max_tokens 給大：思考也算在裡面，太小會把答案截斷；串流不怕逾時，只按實際用量計費
@@ -232,6 +259,7 @@ async def _claude_stream(model: str, messages: list, effort: str) -> AsyncIterat
         async for text in stream.text_stream:  # 思考區塊不會出現在 text_stream
             yield text
         final = await stream.get_final_message()
+    _record(task, getattr(final, "model", None) or model, final.usage)  # 伺服器端換模型時記實際用的
     if final.stop_reason == "refusal":
         cat = final.stop_details.category if final.stop_details else None
         raise RuntimeError(f"Claude 拒絕回答這個請求（類別：{cat or '未提供'}）")

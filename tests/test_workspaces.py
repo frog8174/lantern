@@ -22,8 +22,8 @@ def test_login_required(fake_server, monkeypatch):
 
 def test_me_and_logout(fake_server):
     with TestClient(app) as c:
-        assert c.post("/api/auth/login", json={"user_id": "bob"}).json() == {"id": "bob", "name": "bob"}
-        assert c.get("/api/me").json() == {"id": "bob", "name": "bob"}
+        assert c.post("/api/auth/login", json={"user_id": "bob"}).json() == {"id": "bob", "name": "bob", "email": ""}
+        assert c.get("/api/me").json() == {"id": "bob", "name": "bob", "email": "", "admin": False}
         assert c.post("/api/auth/logout").json() == {"ok": True}
         assert c.get("/api/me").status_code == 401
 

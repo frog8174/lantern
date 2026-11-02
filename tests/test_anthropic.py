@@ -153,3 +153,23 @@ def test_health_lists_task_models(claude, client, monkeypatch):
     assert h["tasks"]["translate"] == "anthropic:claude-haiku-5-5"
     assert h["tasks"]["chat"] == f"anthropic:{OPUS}"
     assert h["translate"]["ok"] and h["translate"]["model"] == "claude-haiku-5-5"  # 另外指定的模型也測了一次
+
+
+# ---------------- 用量記錄（docs/usage.md）----------------
+def test_usage_is_recorded_and_admin_only(claude, papers, client, monkeypatch):
+    from backend import db
+    pid = _pid(papers)
+    sse(client, "POST", f"/api/papers/{pid}/explain", {"text": "lantern encoder", "page": 0})
+    with db.conn() as c:
+        row = dict(c.execute("SELECT * FROM llm_usage ORDER BY rowid DESC LIMIT 1").fetchone())
+    assert (row["user_id"], row["paper_id"], row["task"], row["model"]) == ("alice", pid, "explain", OPUS)
+    assert (row["input"], row["output"]) == (10, 5) and row["cost"] == pytest.approx((10 * 4 + 5 * 20) / 1e6)
+    assert llm.cost_usd(OPUS, 0, 0, 1_000_000, 1_000_000) == pytest.approx(5 + 0.2)  # 快取寫 1.25×、讀 0.2
+
+    monkeypatch.setattr(config, "ADMIN_USERS", set())
+    assert client.get("/api/me").json()["admin"] is False
+    assert client.get("/api/admin/usage").status_code == 403
+    monkeypatch.setattr(config, "ADMIN_USERS", {"alice"})
+    assert client.get("/api/me").json()["admin"] is True
+    rep = client.get("/api/admin/usage?days=7").json()
+    assert any(t["task"] == "explain" and t["calls"] >= 1 for t in rep["by_task"]) and rep["total"]["cost"] > 0

@@ -44,6 +44,11 @@ CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT, paper_id TEXT, role TEXT, content TEXT, created REAL
 );
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, created REAL, settings TEXT DEFAULT '{}');
+CREATE TABLE IF NOT EXISTS llm_usage (
+  ts REAL, user_id TEXT, paper_id TEXT, task TEXT, model TEXT,
+  input INTEGER, output INTEGER, cache_write INTEGER, cache_read INTEGER, cost REAL
+);
+CREATE INDEX IF NOT EXISTS llm_usage_ts ON llm_usage(ts);
 CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, created REAL);
 CREATE TABLE IF NOT EXISTS workspace_papers (
   workspace_id TEXT, paper_id TEXT, added REAL, PRIMARY KEY (workspace_id, paper_id)
@@ -103,8 +108,38 @@ def init() -> None:
 
 def get_user(uid: str) -> dict | None:
     with conn() as c:
-        r = c.execute("SELECT id, name FROM users WHERE id=?", (uid,)).fetchone()
+        r = c.execute("SELECT id, name, email FROM users WHERE id=?", (uid,)).fetchone()
     return dict(r) if r else None
+
+
+def add_usage(uid, pid, task, model, inp, out, cache_write, cache_read, cost) -> None:
+    with conn() as c:
+        c.execute("INSERT INTO llm_usage VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  (time.time(), uid, pid, task, model, inp, out, cache_write, cache_read, cost))
+
+
+def usage_report(days: int) -> dict:
+    """管理者看的全站用量：最近 days 天，依功能、模型、使用者、論文、日期加總。"""
+    since = time.time() - days * 86400
+    sums = ("COUNT(*) calls, SUM(cost) cost, SUM(input) input, SUM(output) output, "
+            "SUM(cache_write) cache_write, SUM(cache_read) cache_read")
+    with conn() as c:
+        def q(sql):
+            return [dict(r) for r in c.execute(sql, (since,))]
+        return {
+            "days": days,
+            "total": q(f"SELECT {sums} FROM llm_usage WHERE ts>=?")[0],
+            "by_task": q(f"SELECT task, {sums} FROM llm_usage WHERE ts>=? GROUP BY task ORDER BY cost DESC"),
+            "by_model": q(f"SELECT model, {sums} FROM llm_usage WHERE ts>=? GROUP BY model ORDER BY cost DESC"),
+            "by_user": q(f"SELECT COALESCE(NULLIF(u.email,''), u.name, l.user_id, '（背景）') who, {sums} "
+                         "FROM llm_usage l LEFT JOIN users u ON u.id=l.user_id WHERE ts>=? "
+                         "GROUP BY l.user_id ORDER BY cost DESC"),
+            "top_papers": q(f"SELECT COALESCE(p.title, l.paper_id) title, {sums} FROM llm_usage l "
+                            "LEFT JOIN papers p ON p.id=l.paper_id WHERE ts>=? AND l.paper_id IS NOT NULL "
+                            "GROUP BY l.paper_id ORDER BY cost DESC LIMIT 10"),
+            "daily": q(f"SELECT date(ts, 'unixepoch', 'localtime') day, {sums} FROM llm_usage "
+                       "WHERE ts>=? GROUP BY day ORDER BY day"),
+        }
 
 
 def get_settings(uid: str) -> dict:
