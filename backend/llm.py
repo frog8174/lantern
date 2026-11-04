@@ -214,11 +214,13 @@ def _to_claude(messages: list) -> tuple[str, list]:
         elif not c.strip():
             continue
         out.append({"role": m["role"], "content": c})
-    # 聊天時（有多個 user 訊息）第一則 user 是整篇論文：在它後面放快取斷點，
-    # 同一篇論文接下來的提問只付快取讀取價（Opus 5.5：$0.20 vs $4 / 百萬 token）
+    # 多輪對話（聊天、Wiki 問答）：最後兩則 user 放快取斷點。前一題寫進快取的前綴，這題整段讀快取
+    # （$0.20 vs 原價 / 百萬 token），只有新加的這題付寫入價；單次請求不寫快取（寫比原價貴）
     users = [m for m in out if m["role"] == "user"]
-    if len(users) > 1 and isinstance(users[0]["content"], str):
-        users[0]["content"] = [{"type": "text", "text": users[0]["content"], "cache_control": {"type": "ephemeral"}}]
+    if len(users) > 1:
+        for m in users[-2:]:
+            if isinstance(m["content"], str):
+                m["content"] = [{"type": "text", "text": m["content"], "cache_control": {"type": "ephemeral"}}]
     return "\n\n".join(system), out
 
 

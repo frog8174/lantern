@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 graphify-out/cache/
 .claude/worktrees/
+eval/answers.json

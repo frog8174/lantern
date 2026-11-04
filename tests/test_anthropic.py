@@ -47,7 +47,7 @@ def test_cache_breakpoint_only_for_multi_turn():
     _, chat = llm._to_claude([{"role": "user", "content": "整篇論文"}, {"role": "assistant", "content": "好"},
                               {"role": "user", "content": "問題"}])
     assert chat[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
-    assert chat[-1]["content"] == "問題"
+    assert chat[-1]["content"][0]["cache_control"] == {"type": "ephemeral"}  # 最後兩則 user 都放斷點
 
 
 # ---------------- 功能 ----------------

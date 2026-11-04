@@ -658,9 +658,9 @@ class ChatIn(BaseModel):
 @app.post("/api/papers/{pid}/chat")
 async def chat(pid: str, uid: Uid, body: ChatIn):
     p = _paper_or_404(pid, uid)
-    history = db.list_messages(pid)
-    msgs, _hits = await features.chat_messages(p, history, body.question, body.page)
-    db.add_message(pid, "user", body.question)
+    history = db.list_messages(pid, limit=1000, ctx=True)
+    msgs, ctx = await features.chat_messages(p, history, body.question, body.page)
+    db.add_message(pid, "user", body.question, ctx)
     return sse(llm.stream_chat(msgs, task="chat"), on_done=lambda t: db.add_message(pid, "assistant", t))
 
 

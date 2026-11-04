@@ -98,6 +98,8 @@ def init() -> None:
             c.execute("ALTER TABLE papers ADD COLUMN starred INTEGER DEFAULT 0")
         if "sha256" not in cols:  # 重複偵測用；舊論文沒有，靠 DOI／標題比對
             c.execute("ALTER TABLE papers ADD COLUMN sha256 TEXT")
+        if "ctx" not in {r["name"] for r in c.execute("PRAGMA table_info(messages)")}:
+            c.execute("ALTER TABLE messages ADD COLUMN ctx TEXT DEFAULT ''")
         # annotations 加上中英對齊結果（譯文裡對應的那段，docs/reader.md）
         if "align" not in {r["name"] for r in c.execute("PRAGMA table_info(annotations)")}:
             c.execute("ALTER TABLE annotations ADD COLUMN align TEXT DEFAULT 'null'")
@@ -498,16 +500,17 @@ def delete_annotation(aid: str) -> None:
 
 
 # ---------- messages ----------
-def add_message(pid: str, role: str, content: str) -> None:
+def add_message(pid: str, role: str, content: str, ctx: str = "") -> None:
+    """ctx：這題附給模型的段落（聊天的段落累積式 RAG），前端不顯示。"""
     with conn() as c:
-        c.execute("INSERT INTO messages (paper_id, role, content, created) VALUES (?,?,?,?)",
-                  (pid, role, content, time.time()))
+        c.execute("INSERT INTO messages (paper_id, role, content, created, ctx) VALUES (?,?,?,?,?)",
+                  (pid, role, content, time.time(), ctx))
 
 
-def list_messages(pid: str, limit: int = 50) -> list[dict]:
+def list_messages(pid: str, limit: int = 50, ctx: bool = False) -> list[dict]:
     with conn() as c:
-        rows = c.execute("SELECT role, content FROM messages WHERE paper_id=? ORDER BY id DESC LIMIT ?",
-                         (pid, limit)).fetchall()
+        rows = c.execute(f"SELECT role, content{', ctx' if ctx else ''} FROM messages WHERE paper_id=? "
+                         "ORDER BY id DESC LIMIT ?", (pid, limit)).fetchall()
     return [dict(r) for r in reversed(rows)]
 
 

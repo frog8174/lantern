@@ -20,7 +20,7 @@
 
 ## 要注意
 - **顯存**：bge-m3 設 `--gpu-memory-utilization 0.03`、reranker 設 0.08，和 LaBSE 的 0.03 加起來約 14%，同卡上的其他服務要留得下；卡比較小或啟動時報顯存不足就調高。
-- **`--max-model-len 8192`**（兩個模型的上限）：段落約 800 字元，但中文論文一個字約一個 token，加上偶爾有很長的單一區塊，1024 會不夠（實際遇過 400 錯誤）。
+- **`--max-model-len 2048`**：`make_chunks` 會把段落切到 800 字元以內，中文約 800～1100 token；reranker 要把問題和段落一起算，2048 還有餘裕。不用模型上限 8192：長文本 reranker 的分數比較不準，送給 Claude 的段落也會變長、變貴。
 - **網域**：Ingress 用 `lantern-bge.` / `lantern-reranker.toolmen.bime.ntu.edu.tw`，跟 LaBSE 一樣走 traefik-private，只給本機開發用；Lantern 正式環境走叢集內位址。
 
 ## Lantern 端設定

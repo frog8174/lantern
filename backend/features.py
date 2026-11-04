@@ -192,26 +192,82 @@ def image_messages(paper: dict, image_data_url: str, page: int, question: str, h
     ]
 
 
-# ---------------- 聊天（RAG）----------------
-async def chat_messages(paper: dict, history: list[dict], question: str, page: int | None) -> tuple[list, list]:
-    if full_text_fits(paper):
-        context = _header(paper) + "\n\n" + _pages_text(paper, range(paper["meta"]["num_pages"]))
-        hits: list[dict] = []
-    else:
-        hits = await retrieval.search(paper["id"], question, k=8)
-        parts = [f"[p.{h['page'] + 1}] {h['text']}" for h in hits]
-        context = _header(paper) + "\n\n相關段落：\n" + "\n\n".join(parts)
-        if page is not None:  # 使用者正在看的那頁也附上
-            context += "\n\n使用者目前所在頁面：\n" + _pages_text(paper, range(page, page + 1))
-    sys = SYSTEM + (
-        "\n回答中引用論文內容時，在句尾標出頁碼，格式固定為 [p.頁碼]，例如 [p.3]。"
-    )
-    msgs = [{"role": "system", "content": sys},
-            {"role": "user", "content": f"以下是論文內容，之後的問題都以此為準：\n\n{context}"},
-            {"role": "assistant", "content": "好的，我已讀完，請問。"}]
-    msgs += history[-10:]  # 只帶最近 10 則，避免爆 context
-    msgs.append({"role": "user", "content": question})
-    return msgs, hits
+# ---------------- 聊天：段落累積式 RAG（docs/chat-rag.md）----------------
+FULL = "@full"            # messages.ctx 的標記：這題附的是整篇論文（不存全文，組訊息時再展開）
+FULL_AFTER_TURNS = 8      # 同一段對話問到第幾題就改送全文：之後每題只付快取讀取價，比繼續檢索划算
+FULL_SENT_RATIO = 0.5     # 累積送出的段落超過全文一半，也改送全文
+CHAT_RULES = SYSTEM + (
+    "\n回答中引用論文內容時，在句尾標出頁碼，格式固定為 [p.頁碼]，例如 [p.3]。"
+    "\n每個問題前面附的是從論文找出的相關段落（或整篇論文），先前附過的段落仍然有效。"
+    "附的內容裡找不到答案時，說明「目前提供的段落沒有提到」，不要編造。"
+)
+
+
+def _expand(paper: dict, ctx: str) -> str:
+    return "整篇論文：\n\n" + _pages_text(paper, range(paper["meta"]["num_pages"])) if ctx == FULL else ctx
+
+
+def _turn(paper: dict, ctx: str, question: str) -> str:
+    return f"{_expand(paper, ctx)}\n\n---\n問題：{question}" if ctx else question
+
+
+async def plan_question(history: list[dict], question: str) -> dict:
+    """追問改寫＋分流：{"query": 補完主詞的英文檢索句, "scope": "local" | "global"}。失敗就用原句、當 local。"""
+    recent = "\n".join(f"{'使用者' if m['role'] == 'user' else '助理'}：{m['content'][:400]}" for m in history[-4:])
+    try:
+        out = await llm.complete_json([{"role": "user", "content":
+            f"最近的對話：\n{recent or '（無）'}\n\n新問題：{question}\n\n"
+            "1. query：把新問題改寫成一句可獨立檢索論文的英文（代名詞、「它」「那個方法」要換成對話裡指的東西；"
+            "保留專有名詞；不要加 paper、authors 這類泛詞）。\n"
+            "2. scope：問的是整篇（主要貢獻、總結、整體方法流程、優缺點總評）填 global；問特定細節、數字、段落、圖表填 local。\n"
+            '只輸出 JSON：{"query": "...", "scope": "local"}'}], task="query", max_tokens=300)
+    except Exception as e:
+        print(f"[chat] plan failed: {type(e).__name__}: {e}")
+        out = None
+    if not isinstance(out, dict) or not isinstance(out.get("query"), str) or not out["query"].strip():
+        return {"query": question, "scope": "local"}
+    return {"query": out["query"], "scope": "global" if out.get("scope") == "global" else "local"}
+
+
+async def new_context(paper: dict, history: list[dict], question: str, page: int | None,
+                      strategy: str | None = None) -> str:
+    """這一題要附上的內容（存進 messages.ctx）。之前附過的不重送，對話前綴就不會變，提示詞快取接得上。"""
+    prior = [m.get("ctx") or "" for m in history if m["role"] == "user"]
+    if FULL in prior:
+        return ""  # 整篇已經在前面了
+    fits = full_text_fits(paper)
+    if (strategy or config.CHAT_CONTEXT) == "full" and fits:
+        return FULL
+    sent = "\n".join(prior)
+    paper_tokens = sum(_est_tokens(t) for t in paper["meta"]["pages"])
+    if fits and (len(prior) + 1 >= FULL_AFTER_TURNS or _est_tokens(sent) > FULL_SENT_RATIO * paper_tokens):
+        return FULL
+    plan = await plan_question(history, question)
+    if plan["scope"] == "global":
+        summary = db.cache_get(paper["id"], "summary")
+        if summary and "【論文整理】" not in sent:
+            return "【論文整理】\n" + summary
+        if not summary and fits:
+            return FULL  # 沒有整理可用：整篇性的問題只看幾段答不好
+    hits = await retrieval.search(paper["id"], plan["query"], k=8)
+    parts = [f"[p.{h['page'] + 1}] {h['text']}" for h in hits if h["text"] not in sent]
+    if page is not None and f"=== 第 {page + 1} 頁 ===" not in sent:  # 使用者正在看的那頁也附上
+        parts.append("使用者目前所在頁面：\n" + _pages_text(paper, range(page, page + 1)))
+    return "相關段落：\n" + "\n\n".join(parts) if parts else ""
+
+
+async def chat_messages(paper: dict, history: list[dict], question: str, page: int | None,
+                        strategy: str | None = None) -> tuple[list, str]:
+    """history 每則 user 訊息帶著當時附的 ctx；回傳 (要送的訊息, 這題的 ctx)。
+    shortcut: 對話全部保留（滑動視窗會讓快取每題失效）；第 8 題起改送全文，1M context 夠用；論文太長時會一直累積"""
+    ctx = await new_context(paper, history, question, page, strategy)
+    msgs = [{"role": "system", "content": CHAT_RULES},
+            {"role": "user", "content": _header(paper) + "\n\n（接下來每個問題會附上相關內容）"},
+            {"role": "assistant", "content": "好的，請問。"}]
+    msgs += [{"role": "user", "content": _turn(paper, m.get("ctx") or "", m["content"])} if m["role"] == "user"
+             else {"role": "assistant", "content": m["content"]} for m in history]
+    msgs.append({"role": "user", "content": _turn(paper, ctx, question)})
+    return msgs, ctx
 
 
 # ---------------- 摘要 ----------------

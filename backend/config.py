@@ -90,6 +90,8 @@ OCR_PROMPT = os.environ.get("OCR_PROMPT", "") or (
 EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "") or LLM_BASE_URL
 EMBED_API_KEY = os.environ.get("EMBED_API_KEY", "") or LLM_API_KEY
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "")
+# 聊天送什麼：auto＝段落累積式 RAG（docs/chat-rag.md）；full＝第一題就送整篇（舊做法，放得下時）
+CHAT_CONTEXT = os.environ.get("CHAT_CONTEXT", "auto").lower()
 # ---- Reranker（/v1/rerank，Jina／Cohere 格式）：粗撈的段落重新排序。留空 = 不重排 ----
 RERANK_BASE_URL = os.environ.get("RERANK_BASE_URL", "")
 RERANK_API_KEY = os.environ.get("RERANK_API_KEY", "") or EMBED_API_KEY

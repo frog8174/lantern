@@ -26,8 +26,24 @@ CANDIDATES = 30  # 有 reranker 時先粗撈幾段再重排
 _APPENDIX_RE = re.compile(r"^\s*(appendix|appendices|supplementary|[A-H](\.\d+)*\.?\s+[A-Z][a-z])", re.I)
 
 
+def _pieces(text: str) -> list[str]:
+    """太長的單一區塊依句子切到 CHUNK_CHARS 以內（實測 19% 的段落超標，最長 4763 字元）。"""
+    if len(text) <= CHUNK_CHARS:
+        return [text]
+    out, cur = [], ""
+    for sent in re.split(r"(?<=[.!?。！？])\s+|(?<=[。！？])", text):
+        if cur and len(cur) + len(sent) + 1 > CHUNK_CHARS:
+            out.append(cur)
+            cur = ""
+        cur = f"{cur} {sent}" if cur else sent
+        while len(cur) > CHUNK_CHARS:  # 一句就超長（表格、公式）：硬切
+            out.append(cur[:CHUNK_CHARS])
+            cur = cur[CHUNK_CHARS:]
+    return out + [cur] if cur else out
+
+
 def make_chunks(blocks: list[Block]) -> list[dict]:
-    """相鄰、同頁的 block 合併到大約 CHUNK_CHARS 字元。"""
+    """相鄰、同頁的 block 合併到大約 CHUNK_CHARS 字元；單一 block 太長就切開。"""
     chunks: list[dict] = []
     cur: dict | None = None
     for b in blocks:
@@ -35,13 +51,14 @@ def make_chunks(blocks: list[Block]) -> list[dict]:
             continue
         # 參考文獻、附錄標題一定開新段，search 才認得出參考文獻區
         head = _is_ref_head(b.text) or (len(b.text) < 80 and _APPENDIX_RE.match(b.text))
-        if cur and not head and cur["page"] == b.page and len(cur["text"]) + len(b.text) < CHUNK_CHARS:
-            cur["text"] += " " + b.text
-            cur["bbox"].append(b.bbox)
-        else:
-            if cur:
-                chunks.append(cur)
-            cur = {"page": b.page, "text": b.text, "bbox": [b.bbox]}
+        for i, text in enumerate(_pieces(b.text)):
+            if cur and not (head and i == 0) and cur["page"] == b.page and len(cur["text"]) + len(text) < CHUNK_CHARS:
+                cur["text"] += " " + text
+                cur["bbox"].append(b.bbox)
+            else:
+                if cur:
+                    chunks.append(cur)
+                cur = {"page": b.page, "text": text, "bbox": [b.bbox]}
     if cur:
         chunks.append(cur)
     return chunks
