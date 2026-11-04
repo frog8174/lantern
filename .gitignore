@@ -5,3 +5,10 @@ __pycache__/
 graphify-out/cache/
 .claude/worktrees/
 eval/answers.json
+# 測試、個人設定、資料備份
+.pytest_cache/
+.claude/settings.local.json
+*.db
+*.db-*
+*.bak*
+.DS_Store
