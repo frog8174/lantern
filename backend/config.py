@@ -60,12 +60,14 @@ LLM_CONCURRENCY = max(1, int(os.environ.get("LLM_CONCURRENCY", "4")))
 # 環境變數 LLM_MODEL_<元件>，例：LLM_MODEL_TRANSLATE=claude-haiku-5-5。
 # 名稱前加 "openai:" 或 "anthropic:" 可以讓這個元件換服務商，
 # 例：LLM_PROVIDER=anthropic 但 LLM_MODEL_TRANSLATE=openai:qwen3.5-9b → 翻譯走本機 vLLM（LLM_BASE_URL）
-TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest", "wiki", "align", "note")
+# query：檢索前把中文問題改寫成英文（docs/retrieval.md），建議設成 Haiku
+TEXT_TASKS = ("explain", "chat", "summary", "translate", "highlight", "outline", "cite", "suggest", "wiki", "align", "note",
+              "query")
 TASK_MODELS = {t: os.environ.get(f"LLM_MODEL_{t.upper()}", "") for t in TEXT_TASKS}
 # 中英對齊（螢光筆同步到譯文）是又小又多的工作：沒另外設就跟翻譯用同一個便宜模型
 TASK_MODELS["align"] = TASK_MODELS["align"] or TASK_MODELS["translate"]
 # 各元件的思考深度（只用在 Claude；留空 = LLM_EFFORT）。量大又單純的工作預設 low
-_EFFORT_DEFAULTS = {"translate": "low", "outline": "low", "suggest": "low", "align": "low"}
+_EFFORT_DEFAULTS = {"translate": "low", "outline": "low", "suggest": "low", "align": "low", "query": "low"}
 TASK_EFFORT = {t: os.environ.get(f"LLM_EFFORT_{t.upper()}", "") or _EFFORT_DEFAULTS.get(t, "") for t in TEXT_TASKS}
 
 # ---- 視覺模型（圖表 / 公式截圖解釋）。留空就用文字模型（若它本身支援影像）----
@@ -88,6 +90,10 @@ OCR_PROMPT = os.environ.get("OCR_PROMPT", "") or (
 EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "") or LLM_BASE_URL
 EMBED_API_KEY = os.environ.get("EMBED_API_KEY", "") or LLM_API_KEY
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "")
+# ---- Reranker（/v1/rerank，Jina／Cohere 格式）：粗撈的段落重新排序。留空 = 不重排 ----
+RERANK_BASE_URL = os.environ.get("RERANK_BASE_URL", "")
+RERANK_API_KEY = os.environ.get("RERANK_API_KEY", "") or EMBED_API_KEY
+RERANK_MODEL = os.environ.get("RERANK_MODEL", "")
 
 # ---- 逐句對應用的 LaBSE 句向量（docs/labse.md）。URL 留空 = 不做，選字時改問 LLM ----
 ALIGN_EMBED_URL = os.environ.get("ALIGN_EMBED_URL", "")

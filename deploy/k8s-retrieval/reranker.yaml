@@ -29,8 +29,8 @@ spec:
                 --served-model-name bge-reranker \
                 --runner pooling \
                 --dtype float16 \
-                --max-model-len 1024 \
-                --gpu-memory-utilization 0.08 \
+                --max-model-len 8192 \
+                --gpu-memory-utilization 0.05 \
                 --port 8000
           # 模型是 XLMRobertaForSequenceClassification，vLLM 會自動當成 score/rerank 模型
           env:
@@ -78,7 +78,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    cert-manager.io/cluster-issuer: cert-manager-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik-private
   tls:

@@ -18,9 +18,12 @@ from collections import Counter
 import numpy as np
 
 from . import config, db, llm
-from .pdf_parse import Block
+from .pdf_parse import Block, _is_ref_head
 
 CHUNK_CHARS = 800
+CANDIDATES = 30  # 有 reranker 時先粗撈幾段再重排
+# 參考文獻後面接的附錄標題（Appendix、A Proofs、A.1 Setup）：從這裡起又是正文
+_APPENDIX_RE = re.compile(r"^\s*(appendix|appendices|supplementary|[A-H](\.\d+)*\.?\s+[A-Z][a-z])", re.I)
 
 
 def make_chunks(blocks: list[Block]) -> list[dict]:
@@ -30,7 +33,9 @@ def make_chunks(blocks: list[Block]) -> list[dict]:
     for b in blocks:
         if len(b.text) < 3:
             continue
-        if cur and cur["page"] == b.page and len(cur["text"]) + len(b.text) < CHUNK_CHARS:
+        # 參考文獻、附錄標題一定開新段，search 才認得出參考文獻區
+        head = _is_ref_head(b.text) or (len(b.text) < 80 and _APPENDIX_RE.match(b.text))
+        if cur and not head and cur["page"] == b.page and len(cur["text"]) + len(b.text) < CHUNK_CHARS:
             cur["text"] += " " + b.text
             cur["bbox"].append(b.bbox)
         else:
@@ -44,7 +49,11 @@ def make_chunks(blocks: list[Block]) -> list[dict]:
 
 async def build_index(pid: str, blocks: list[Block]) -> int:
     chunks = make_chunks(blocks)
-    vecs = await llm.embed([c["text"] for c in chunks])
+    try:
+        vecs = await llm.embed([c["text"] for c in chunks])
+    except Exception as e:  # embedding 服務掛了不能讓上傳失敗：先只用關鍵字，之後 reindex 補向量
+        print(f"[retrieval] embed failed, BM25 only: {type(e).__name__}: {e}")
+        vecs = None
     if vecs:
         for c, v in zip(chunks, vecs):
             arr = np.asarray(v, dtype=np.float32)
@@ -82,10 +91,43 @@ def _bm25(query: str, docs: list[str], k1: float = 1.5, b: float = 0.75) -> list
     return scores
 
 
+def _not_refs(chunks: list[dict]) -> list[dict]:
+    """拿掉參考文獻區（最後一個參考文獻標題到下一個附錄標題）：一堆專有名詞，常把檢索帶偏。"""
+    start = max((i for i, c in enumerate(chunks) if _is_ref_head(c["text"].split(" ", 1)[0])), default=None)
+    if start is None:
+        return chunks
+    end = next((i for i in range(start + 1, len(chunks)) if _APPENDIX_RE.match(chunks[i]["text"][:80])), len(chunks))
+    return chunks[:start] + chunks[end:]
+
+
+_CJK_RE = re.compile(r"[一-鿿]")
+_english_cache: dict[str, str] = {}
+
+
+async def english_query(q: str) -> str:
+    """中文問題先改寫成英文檢索詞：論文是英文，BM25 和 reranker 對英文問題準很多（中文 0.1 vs 英文 0.9）。"""
+    if not _CJK_RE.search(q) or config.LLM_MOCK:
+        return q
+    if q not in _english_cache:  # Wiki 問答會對每篇來源論文各查一次，同一題只改寫一次
+        try:
+            en = await llm.complete([{"role": "user", "content":
+                "Rewrite this question about a research paper as a concise English search query. "
+                "Keep technical terms; leave out generic words like 'paper' or 'authors'. "
+                f"Output only the query.\n\n{q}"}], task="query", max_tokens=200)
+        except Exception as e:  # 改寫失敗就用原句，bge-m3 本來就跨語言
+            print(f"[retrieval] query rewrite failed: {type(e).__name__}: {e}")
+            return q
+        if len(_english_cache) > 500:
+            _english_cache.clear()
+        _english_cache[q] = en or q
+    return _english_cache[q]
+
+
 async def search(pid: str, query: str, k: int = 6) -> list[dict]:
-    chunks = db.load_chunks(pid)
+    chunks = _not_refs(db.load_chunks(pid))
     if not chunks:
         return []
+    query = await english_query(query)
     texts = [c["text"] for c in chunks]
     kw = np.asarray(_bm25(query, texts))
     if kw.max() > 0:
@@ -105,6 +147,15 @@ async def search(pid: str, query: str, k: int = 6) -> list[dict]:
                 # 混合檢索：語意相似度為主，關鍵字補強（專有名詞、公式符號很有用）
                 score = 0.7 * sem + 0.3 * kw
 
-    top = np.argsort(-score)[:k]
-    hits = [chunks[i] | {"score": float(score[i])} for i in top if score[i] > 0]
+    top = [i for i in np.argsort(-score)[:CANDIDATES if config.RERANK_MODEL else k] if score[i] > 0]
+    try:
+        rr = await llm.rerank(query, [texts[i] for i in top])
+    except Exception as e:  # reranker 掛了退回混合分數，聊天照常
+        print(f"[retrieval] rerank failed: {type(e).__name__}: {e}")
+        rr = None
+    if rr:  # 用名次不用門檻：中文問題的 reranker 分數普遍偏低，但順序是對的
+        top = [i for _, i in sorted(zip(rr, top), key=lambda x: -x[0])]
+        score = np.zeros(len(chunks))
+        score[top] = rr
+    hits = [chunks[i] | {"score": float(score[i])} for i in top[:k]]
     return sorted(hits, key=lambda c: (c["page"], c["idx"]))  # 照閱讀順序排，模型比較好理解

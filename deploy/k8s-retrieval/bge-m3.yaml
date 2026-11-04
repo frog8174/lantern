@@ -30,11 +30,10 @@ spec:
                 --runner pooling \
                 --convert embed \
                 --dtype float16 \
-                --max-model-len 1024 \
-                --gpu-memory-utilization 0.03 \
+                --max-model-len 8192 \
+                --gpu-memory-utilization 0.05 \
                 --port 8000
-          # max-model-len：Lantern 的段落約 800 字元（~200 token），1024 綽綽有餘，也省顯存。
-          # gpu-memory-utilization：權重 fp16 約 1.1 GB；0.03 要 48 GB 以上的卡才放得下，啟動報顯存不足就調高
+
           env:
             - name: VLLM_API_KEY
               valueFrom: { secretKeyRef: { name: labse-secrets, key: VLLM_API_KEY } }
@@ -80,7 +79,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    cert-manager.io/cluster-issuer: cert-manager-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik-private
   tls:

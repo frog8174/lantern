@@ -37,6 +37,7 @@ kubectl -n lantern create secret generic lantern-secrets \
   --from-literal=OIDC_CLIENT_SECRET='…' \
   --from-literal=SESSION_SECRET="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" \
   --from-literal=ANTHROPIC_API_KEY='…'   --from-literal=ALIGN_EMBED_API_KEY='…'   # LaBSE 的 VLLM_API_KEY（docs/labse.md）；沒有就拿掉，逐句對應退回問 LLM
+  # --from-literal=EMBED_API_KEY='…'     # bge-m3／reranker 的 VLLM_API_KEY（同一把，docs/retrieval.md）
   # 本機有設 SEMANTIC_SCHOLAR_API_KEY 的話也加上（沒有 key 時 Semantic Scholar 常被限流）
 ```
 

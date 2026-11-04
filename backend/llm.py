@@ -16,6 +16,7 @@ from contextvars import ContextVar
 from typing import AsyncIterator
 
 import anthropic
+import httpx
 import openai
 from openai import AsyncOpenAI
 
@@ -308,6 +309,21 @@ async def embed(texts: list[str]) -> list[list[float]] | None:
         resp = await _embed.embeddings.create(model=config.EMBED_MODEL, input=texts[i: i + 64])
         out.extend(d.embedding for d in resp.data)
     return out
+
+
+async def rerank(query: str, docs: list[str]) -> list[float] | None:
+    """每段和問題的相關分數（跟 docs 同順序）；沒設定 RERANK_MODEL 時回 None。"""
+    if not config.RERANK_MODEL or config.LLM_MOCK or not docs:
+        return None
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(f"{config.RERANK_BASE_URL.rstrip('/')}/rerank",
+                         headers={"Authorization": f"Bearer {config.RERANK_API_KEY}"},
+                         json={"model": config.RERANK_MODEL, "query": query, "documents": docs})
+    r.raise_for_status()
+    scores = [0.0] * len(docs)
+    for x in r.json()["results"]:
+        scores[x["index"]] = x["relevance_score"]
+    return scores
 
 
 # ---------- 連線檢查（/api/health）----------

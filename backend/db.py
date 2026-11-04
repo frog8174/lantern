@@ -434,6 +434,7 @@ def clear_wiki_messages(wid: str) -> None:
 # ---------- chunks ----------
 def save_chunks(pid: str, chunks: list[dict]) -> None:
     with conn() as c:
+        c.execute("DELETE FROM chunks WHERE paper_id=?", (pid,))  # 重建索引時段數可能變少
         c.executemany(
             "INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?)",
             [(pid, i, ch["page"], ch["text"], json.dumps(ch["bbox"]), ch.get("emb")) for i, ch in enumerate(chunks)],

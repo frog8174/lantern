@@ -25,10 +25,21 @@ data:
   LLM_MODEL_CITE: anthropic:claude-sonnet-5-5
   LLM_MODEL_OUTLINE: anthropic:claude-haiku-5-5
   LLM_MODEL_SUGGEST: anthropic:claude-haiku-5-5
+  # 省錢：聊天、Wiki、筆記、看圖用 Sonnet；摘要留 LLM_MODEL（Opus）
+  LLM_MODEL_CHAT: anthropic:claude-sonnet-5-5
+  LLM_MODEL_WIKI: anthropic:claude-sonnet-5-5
+  LLM_MODEL_NOTE: anthropic:claude-sonnet-5-5
+  VLM_MODEL: anthropic:claude-sonnet-5-5
+  LLM_MODEL_QUERY: anthropic:claude-haiku-5-5   # 檢索前把中文問題改寫成英文
   OCR_ENABLED: "true"
   OCR_MODEL: anthropic:claude-sonnet-5-5
   # 逐句對應的 LaBSE（docs/labse.md）；金鑰 ALIGN_EMBED_API_KEY 放 Secret
   ALIGN_EMBED_URL: http://labse.aaron-personal.svc.cluster.local:8000/v1
   ALIGN_EMBED_MODEL: labse
+  # 聊天／Wiki 檢索（docs/retrieval.md）；金鑰 EMBED_API_KEY 放 Secret（reranker 沿用同一把）
+  EMBED_BASE_URL: http://bge-m3.aaron-personal.svc.cluster.local:8000/v1
+  EMBED_MODEL: bge-m3
+  RERANK_BASE_URL: http://bge-reranker.aaron-personal.svc.cluster.local:8000/v1
+  RERANK_MODEL: bge-reranker
   TARGET_LANG: 繁體中文（台灣用語）
   SEMANTIC_SCHOLAR_LOOKUP: "true"
